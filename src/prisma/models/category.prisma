@@ -1,9 +1,0 @@
-model Category {
-    id String @id @default(uuid()) @db.Uuid
-    name String @unique
-    description String?
-    
-    products Product[]
-
-    @@map("categories")
-}
