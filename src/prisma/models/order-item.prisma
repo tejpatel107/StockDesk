@@ -1,0 +1,15 @@
+model OrderItem {
+    id String @id @default(uuid()) @db.Uuid
+
+    orderId String @db.Uuid @map("order_id")
+    order Order @relation(fields: [orderId],references: [id])
+    
+    productId String @db.Uuid @map("product_id")
+    product Product @relation(fields: [productId],references: [id])
+
+    quantity Int
+    unitPriceAtTimeOfOrder Decimal @db.Decimal @map("unit_price_at_time_of_order")
+    lineTotal Decimal @db.Decimal @map("line_total")
+
+    @@map("order_items")
+}

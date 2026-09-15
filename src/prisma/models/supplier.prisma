@@ -1,0 +1,10 @@
+model Supplier {
+    id          String @id @default(uuid()) @db.Uuid
+    name        String @unique
+    email       String @unique
+    phoneNumber String @unique @map("phone_number")
+
+    productSuppliers ProductSupplier[]
+
+    @@map("suppliers")
+}
