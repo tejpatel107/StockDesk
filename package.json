@@ -8,12 +8,13 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "create:db": "bash scripts/migrate-db.sh",
+    "seed": "tsx scripts/seed.ts"
   },
   "author": "Tej Patel",
   "license": "ISC",
   "dependencies": {
-    "@types/bcrypt": "^6.0.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -22,6 +23,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.5.1",

@@ -14,4 +14,4 @@ app.get("/health", async (req: Request, res: Response) => {
 
 app.listen(PORT, () => {
     console.log(`server is listening on PORT: ${PORT}`);
-})
+});
