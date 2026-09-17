@@ -3,6 +3,8 @@ import type { roles } from "../../db/roles.js";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import "dotenv/config";
+import { loginValidation, userSignUpValidation } from "../validators/user.validaton.js";
+import { error } from "node:console";
 
 // dotenv.config({
 //     path: "../../.env",
@@ -51,4 +53,32 @@ export function authenticateJwtToken(req: AuthenticatedRequest, res: Response, n
         });
     }
 
+}
+
+export function validateSingUpRequest(req: Request, res: Response, next: NextFunction) {
+
+    const result = userSignUpValidation.safeParse(req.body);
+
+    if (result.error) {
+        return res.status(400).json({
+            error : result.error
+        });
+    }
+
+    req.body = result.data;
+    next();
+}
+
+export function validateLoginRequest(req: Request, res: Response, next: NextFunction) {
+
+    const result = loginValidation.safeParse(req.body);
+
+    if (result.error) {
+        return res.status(400).json({
+            error : result.error
+        });
+    }
+
+    req.body = result.data;
+    next();
 }
