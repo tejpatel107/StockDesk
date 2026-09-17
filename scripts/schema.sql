@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS "user" (
 	"user_name" varchar(50) NOT NULL,
 	"user_email" varchar(100) NOT NULL UNIQUE,
 	"user_password" text NOT NULL,
+	"password_salt" text NOT NULL,
 	"user_role" varchar(10) NOT NULL,
 	"flag_deleted" boolean NOT NULL,
 	"history_id" uuid,
@@ -97,6 +98,6 @@ ALTER TABLE "order_item" ADD CONSTRAINT "order_item_fk1" FOREIGN KEY ("order_id"
 ALTER TABLE "order_item" ADD CONSTRAINT "order_item_fk2" FOREIGN KEY ("product_id") REFERENCES "product"("product_id");
 ALTER TABLE "product_supplier" ADD CONSTRAINT "product_supplier_fk0" FOREIGN KEY ("product_id") REFERENCES "product"("product_id");
 ALTER TABLE "product_supplier" ADD CONSTRAINT "product_supplier_fk1" FOREIGN KEY ("supplier_id") REFERENCES "supplier"("supplier_id");
-ALTER TABLE "change_log" ADD CONSTRAINT "change_log_fk1" FOREIGN KEY ("user_id") REFERENCES "user"("user_id");
+ALTER TABLE "change_log" ADD CONSTRAINT "change_log_fk1" FOREIGN KEY ("user_id") REFERENCES "user"("user_id") DEFERRABLE INITIALLY DEFERRED;
 COMMENT ON TABLE "user" IS 'User records table';
 COMMENT ON TABLE "category" IS 'table for different categories of products';
