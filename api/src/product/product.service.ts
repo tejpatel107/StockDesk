@@ -65,5 +65,6 @@ async function getProductByCategoryId(req: Request) {
 
 export default {
     getAllProducts,
-    getProductByNameOrSku
+    getProductByNameOrSku,
+    getProductByCategoryId
 }
