@@ -1,29 +1,53 @@
-import { request, type Request, type Response } from "express";
-import service from "./product.service.js";
+import { type Request, type Response } from "express";
+import { getAllProductsService, getProductsByCategoryIdService, getProductsByNameOrSkuService, getProductsWithinStockService, getProductsWithinPriceRangeService, addNewProductService, deleteProductService } from "./product.service.js";
 
-export async function getProducts(req: Request, res: Response) {
-    const { categoryId, search } = req.query;
+export async function getProductsController(req: Request, res: Response) {
+    const { categoryId, search, minPrice, maxPrice, inStock } = req.query;
 
-    if (categoryId === "string") {
-        return await getProductByCategoryId(req, res);
-    } else if (search === "string") {
-        return await getProductByNameOrSku(req, res);
+    if (typeof categoryId === "string" && categoryId.length > 0) {
+        return await getProductsByCategoryId(req, res);
+    } else if (typeof search === "string" && search.length > 0) {
+        return await getProductsByNameOrSku(req, res);
+    } else if (minPrice && maxPrice) {
+        return await getProductsWithinPriceRange(req, res);
+    } else if (inStock?.length > 0) {
+        return await getProductsWithinStock(req, res);
     }
     return await getAllProducts(req, res);
 
 }
 
 async function getAllProducts(req: Request, res: Response) {
-    const result = await service.getAllProducts();
-    return res.status(request?.statusCode as number).json(result?.data);
+    const result = await getAllProductsService();
+    return res.status(result?.statusCode as number).json(result?.data);
 };
 
-async function getProductByNameOrSku(req: Request, res: Response) {
-    const result = await service.getProductByNameOrSku(req);
-    return res.status(request?.statusCode as number).json(result?.data);
+async function getProductsByNameOrSku(req: Request, res: Response) {
+    const result = await getProductsByNameOrSkuService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
 }
 
-async function getProductByCategoryId(req: Request, res: Response) {
-    const result = await service.getProductByCategoryId(req);
-    return res.status(request?.statusCode as number).json(result?.data);
+async function getProductsByCategoryId(req: Request, res: Response) {
+    const result = await getProductsByCategoryIdService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+
+async function getProductsWithinPriceRange(req: Request, res: Response) {
+    const result = await getProductsWithinPriceRangeService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+
+async function getProductsWithinStock(req: Request, res: Response) {
+    const result = await getProductsWithinStockService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+
+export async function addNewProductController(req: Request, res: Response) {
+    const result = await addNewProductService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+
+export async function deleteProductController(req: Request, res: Response){
+    const result = await deleteProductService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
 }

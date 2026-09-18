@@ -19,9 +19,7 @@ export async function loginService(req: Request) {
         }
     }
 
-    const hashedPassword = await hashPassword(password);
-
-    if (user.password !== hashedPassword) {
+    if (! await verifyPassword(password, user.password)) {
         return {
             statusCode: 403,
             data: {
@@ -31,7 +29,7 @@ export async function loginService(req: Request) {
         };
     }
 
-    const token = await generateJwtToken({ id: user.id, role: user.role });
+    const token = await generateJwtToken({ userId: user.id, role: user.role });
 
     return {
         statusCode: 200,

@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from "express";
 import "dotenv/config";
 import { loginValidation, signUpValidation } from "../validators/user.validaton.js";
 import { verifyJwt } from "../utilities/token.js";
+import { error } from "node:console";
 
 const jwtSecret =  process.env.JWT_SECRET_KEY || " ";
 

@@ -1,9 +1,10 @@
 import express, { type Router } from "express";
-import { getProducts } from "./product.controller.js";
-import { authenticateJwtToken } from "../../middlewares/auth.middleware.js";
+import { addNewProductController, deleteProductController, getProductsController } from "./product.controller.js";
 
 const productRouter : Router = express.Router();
 
-productRouter.get("/", authenticateJwtToken, getProducts);
+productRouter.get("/", getProductsController);
+productRouter.post("/", addNewProductController);
+productRouter.delete("/", deleteProductController);
 
 export default productRouter;
