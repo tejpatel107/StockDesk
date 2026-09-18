@@ -17,7 +17,7 @@ const passwordValidation = z.string()
         message: "Password must contain at least one special character",
     });
 
-export const userSignUpValidation = z.object({
+export const signUpValidation = z.object({
     email: z.email(),
     firstName: z.string(),
     lastName: z.string(),

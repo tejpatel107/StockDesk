@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS "user" (
 	"user_name" varchar(50) NOT NULL,
 	"user_email" varchar(100) NOT NULL UNIQUE,
 	"user_password" text NOT NULL,
-	"password_salt" text NOT NULL,
 	"user_role" varchar(10) NOT NULL,
 	"flag_deleted" boolean NOT NULL,
 	"history_id" uuid,

@@ -1,6 +1,6 @@
 import type { Request } from "express";
 import { createNewUser, getUserByEmail } from "./auth.db.js";
-import { hashPasswordWithSalt } from "../../utilities/hash.js";
+import { hashPassword, verifyPassword } from "../../utilities/hash.js";
 import { generateJwtToken } from "../../utilities/token.js";
 
 
@@ -19,7 +19,7 @@ export async function loginService(req: Request) {
         }
     }
 
-    const{salt, password: hashedPassword }= hashPasswordWithSalt(password, user.salt);
+    const hashedPassword = await hashPassword(password);
 
     if (user.password !== hashedPassword) {
         return {
@@ -58,9 +58,9 @@ export async function registerService(req: Request) {
         }
     }
 
-    const { salt, password: hashedPassword } = hashPasswordWithSalt(password);
+    const hashedPassword = await hashPassword(password);
 
-    user = await createNewUser( firstName + " " + lastName, email, hashedPassword, salt, role);
+    user = await createNewUser( firstName + " " + lastName, email, hashedPassword, role);
 
     return {
         statusCode: 201,

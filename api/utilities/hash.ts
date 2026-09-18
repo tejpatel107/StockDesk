@@ -1,10 +1,11 @@
-import { randomBytes, createHmac } from 'crypto';
+import bcrypt from 'bcrypt';
 
-export function hashPasswordWithSalt(password:string, userSalt: string | undefined = undefined) {
-  const salt = userSalt ?? randomBytes(256).toString('hex');
-  const hashedPassword = createHmac('sha256', salt)
-    .update(password)
-    .digest('hex');
+export async function hashPassword(plainPassword: string): Promise<string> {
+  const saltRounds = 10; // cost factor — higher = slower but more secure
+  const hash = await bcrypt.hash(plainPassword, saltRounds);
+  return hash;
+}
 
-  return { salt, password: hashedPassword };
+export async function verifyPassword(plainPassword: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(plainPassword, hash);
 }

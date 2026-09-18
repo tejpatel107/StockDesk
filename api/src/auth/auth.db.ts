@@ -6,7 +6,6 @@ interface UserRecord {
     email: string,
     password: string,
     id: UUID,
-    salt: string,
     role: roles
 }
 
@@ -15,7 +14,6 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
         SELECT user_email AS email, 
                user_password AS "password",
                user_id AS "id",
-               password_salt AS "salt",
                user_role AS "role"
                FROM "user" WHERE user_email = $1;`;
 
@@ -26,7 +24,7 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
     }
 }
 
-export async function createNewUser(name: string, email: string, password: string, salt: string, role: roles): Promise<UserRecord | undefined> {
+export async function createNewUser(name: string, email: string, password: string, role: roles): Promise<UserRecord | undefined> {
 
     const userId = randomUUID();
     const changeLogId = randomUUID();
@@ -46,20 +44,15 @@ export async function createNewUser(name: string, email: string, password: strin
 
         const res = await client.query<UserRecord>(
             `INSERT INTO "user"
-            (user_id, user_name, user_email, user_password, password_salt, user_role, change_log_id, flag_deleted, history_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, false, NULL)
+            (user_id, user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
+            VALUES ($1, $2, $3, $4, $5, $6, false, NULL)
             RETURNING
                 user_id AS "userId",
                 user_name AS "userName",
                 user_email AS "email",
                 user_role AS "userRole";`,
-            [userId, name, email, password, salt, role, changeLogId]
+            [userId, name, email, password, role, changeLogId]
         );
-
-        // await client.query(
-        //     `UPDATE "user" SET change_log_id = $1 WHERE user_id = $2;`,
-        //     [changeLogId, userId]
-        // );
 
         await client.query('COMMIT');
         return res.rows[0];
