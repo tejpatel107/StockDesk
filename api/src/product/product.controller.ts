@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { getAllProductsService, getProductsByCategoryIdService, getProductsByNameOrSkuService, getProductsWithinStockService, getProductsWithinPriceRangeService, addNewProductService, deleteProductService } from "./product.service.js";
+import { getAllProductsService, getProductsByCategoryIdService, getProductsByNameOrSkuService, getProductsWithinStockService, getProductsWithinPriceRangeService, addNewProductService, deleteProductService, updateProductService } from "./product.service.js";
 
 export async function getProductsController(req: Request, res: Response) {
     const { categoryId, search, minPrice, maxPrice, inStock } = req.query;
@@ -51,3 +51,9 @@ export async function deleteProductController(req: Request, res: Response){
     const result = await deleteProductService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }
+
+export async function updateProductController(req: Request, res: Response){
+    const result = await updateProductService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+

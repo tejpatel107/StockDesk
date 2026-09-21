@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS "category" (
 CREATE TABLE IF NOT EXISTS "product" (
 	"product_id" uuid NOT NULL UNIQUE,
 	"product_name" varchar(100) NOT NULL,
-	"product_sku" varchar(100) NOT NULL UNIQUE,
+	"product_sku" varchar(100) NOT NULL,
 	"product_price" numeric(10,0) NOT NULL,
 	"product_stock_quantity" integer NOT NULL,
 	"category_id" uuid NOT NULL, 
@@ -34,9 +34,9 @@ CREATE TABLE IF NOT EXISTS "product" (
 );
 CREATE TABLE IF NOT EXISTS "supplier" (
 	"supplier_id" uuid NOT NULL UNIQUE,
-	"supplier_name" varchar(100) NOT NULL UNIQUE,
-	"supplier_email" varchar(100) NOT NULL UNIQUE,
-	"supplier_phone_number" varchar(25) UNIQUE,
+	"supplier_name" varchar(100) NOT NULL,
+	"supplier_email" varchar(100) NOT NULL,
+	"supplier_phone_number" varchar(25) NOT NULL,
 	"flag_deleted" boolean NOT NULL,
 	"history_id" uuid,
 	"change_log_id" uuid NOT NULL,
