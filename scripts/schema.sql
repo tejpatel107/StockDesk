@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS "user" (
 -- table for different categories of products
 CREATE TABLE IF NOT EXISTS "category" (
 	"category_id" uuid NOT NULL UNIQUE,
-	"category_name" varchar(100) NOT NULL UNIQUE,
+	"category_name" varchar(100) NOT NULL,
 	"category_description" text NOT NULL,
 	"flag_deleted" boolean NOT NULL,
 	"history_id" uuid,
@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS "supplier" (
 );
 CREATE TABLE IF NOT EXISTS "customer" (
 	"customer_id" uuid NOT NULL UNIQUE,
-	"customer_phone_number" varchar(25) NOT NULL UNIQUE,
+	"customer_phone_number" varchar(25) NOT NULL,
 	"customer_address" text,
-	"user_id" uuid NOT NULL UNIQUE,
+	"user_id" uuid NOT NULL,
 	"flag_deleted" boolean NOT NULL,
 	"history_id" uuid,
 	"change_log_id" uuid NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS "order" (
 	"order_date" date NOT NULL,
 	"order_created_at" time without time zone NOT NULL,
 	"order_status" varchar(15) NOT NULL,
-	"order_total_amount" numeric(10,0) NOT NULL,
+	"order_total_amount" numeric(10,2) NOT NULL,
 	"flag_deleted" boolean NOT NULL,
 	"history_id" uuid,
 	"change_log_id" uuid NOT NULL,
@@ -69,8 +69,8 @@ CREATE TABLE IF NOT EXISTS "order_item" (
 	"order_id" uuid NOT NULL,
 	"product_id" uuid NOT NULL,
 	"order_item_quantity" integer NOT NULL,
-	"order_item_unit_price_at_time_of_order" numeric(10,0) NOT NULL,
-	"order_item_line_total" numeric(10,0) NOT NULL,
+	"order_item_unit_price_at_time_of_order" numeric(10,2) NOT NULL,
+	"order_item_line_total" numeric(10,2) NOT NULL,
 	PRIMARY KEY ("order_item_id")
 );
 CREATE TABLE IF NOT EXISTS "product_supplier" (

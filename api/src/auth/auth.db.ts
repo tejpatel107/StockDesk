@@ -1,6 +1,7 @@
 import { randomUUID, type UUID } from "node:crypto";
 import { pool } from "../../../db/db.js";
 import type { roles } from "../../../db/roles.js";
+import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 
 interface UserRecord {
     email: string,
@@ -9,7 +10,7 @@ interface UserRecord {
     role: roles
 }
 
-export async function getUserByEmail(email: string): Promise<UserRecord | undefined> {
+export async function getUserByEmailDb(email: string): Promise<UserRecord | undefined> {
     let query = `
         SELECT user_email AS email, 
                user_password AS "password",
@@ -24,22 +25,24 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
     }
 }
 
-export async function createNewUser(name: string, email: string, password: string, role: roles): Promise<UserRecord | undefined> {
+export async function addNewUserDb(userId: string, name: string, email: string, password: string, role: roles): Promise<UserRecord | undefined> {
 
-    const userId = randomUUID();
-    const changeLogId = randomUUID();
 
     const client = await pool.connect();
-
     try {
 
         await client.query('BEGIN');
         await client.query('SET CONSTRAINTS ALL DEFERRED');
 
-        await client.query(
-            `INSERT INTO "change_log" (change_log_id, user_id, change_log_timestamp)
-            VALUES ($1, $2, now());`,
-            [changeLogId, userId]
+        const { rows : [ changeLog ] } = await client.query(`
+            INSERT INTO change_log (
+                change_log_id,
+                user_id,
+                change_log_timestamp
+            ) VALUES ( $1, $2, now())
+            RETURNING *           
+            `,
+            [randomUUID(), userId]
         );
 
         const res = await client.query<UserRecord>(
@@ -51,7 +54,7 @@ export async function createNewUser(name: string, email: string, password: strin
                 user_name AS "userName",
                 user_email AS "email",
                 user_role AS "userRole";`,
-            [userId, name, email, password, role, changeLogId]
+            [userId, name, email, password, role, changeLog.change_log_id]
         );
 
         await client.query('COMMIT');

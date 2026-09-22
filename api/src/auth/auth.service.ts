@@ -1,13 +1,17 @@
 import type { Request } from "express";
-import { createNewUser, getUserByEmail } from "./auth.db.js";
+import { addNewUserDb, getUserByEmailDb } from "./auth.db.js";
 import { hashPassword, verifyPassword } from "../../utilities/hash.js";
 import { generateJwtToken } from "../../utilities/token.js";
+import { roles } from "../../../db/roles.js";
+import { randomUUID } from "node:crypto";
+import { addNewCustomerDb } from "../customer/customer.db.js";
+import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 
 
 export async function loginService(req: Request) {
 
     const { email, password } = req.body;
-    const user = await getUserByEmail(email);
+    const user = await getUserByEmailDb(email);
 
     if (!user) {
         return {
@@ -43,8 +47,10 @@ export async function loginService(req: Request) {
 
 export async function registerService(req: Request) {
 
-    const { firstName, lastName, email, password, role } = req.body;
-    let user = await getUserByEmail(email);
+    const { firstName, lastName, email, password, contactNumber, address, role } = req.body;
+    let user = await getUserByEmailDb(email);
+
+    console.log(contactNumber);
 
     if (user) {
         return {
@@ -57,8 +63,14 @@ export async function registerService(req: Request) {
     }
 
     const hashedPassword = await hashPassword(password);
+    const userId = randomUUID();
 
-    user = await createNewUser( firstName + " " + lastName, email, hashedPassword, role);
+    if (role === roles.CUSTOMER) {
+        user = await addNewCustomerDb(randomUUID(), userId, (firstName as string).concat(lastName as string), email, phoneNumber, address, hashedPassword, roles.CUSTOMER);
+    }
+    else {
+        user = await addNewUserDb(userId, firstName + " " + lastName, email, hashedPassword, role);
+    }
 
     return {
         statusCode: 201,
