@@ -189,8 +189,6 @@ export async function updateCustomerDetailsInUserTableDb(client: PoolClient, set
         values
     );
 
-    // const historyUserId = randomUUID();
-
     await client.query(
         `INSERT INTO "user"
                 (user_name, 

@@ -6,6 +6,7 @@ import productRouter from "./src/product/index.js";
 import supplierRouter from "./src/supplier/index.js";
 import categoryRouter from "./src/category/index.js";
 import customerRouter from "./src/customer/index.js";
+import reportRouter from "./src/report/index.js";
 
 const appRouter : Router = express.Router();
 
@@ -14,6 +15,6 @@ appRouter.use("/products", authenticateJwtToken, productRouter);
 appRouter.use("/suppliers", authenticateJwtToken, supplierRouter);
 appRouter.use("/categories", authenticateJwtToken, categoryRouter);
 appRouter.use("/customers", authenticateJwtToken, customerRouter);
-
+appRouter.use("/reports", authenticateJwtToken, reportRouter);
 
 export default appRouter;

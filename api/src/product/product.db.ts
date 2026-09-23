@@ -141,8 +141,6 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                     WHERE product_id = $2
                 `, [changeLogId, product.product_id]);
         
-        // const historyProductId = randomUUID();
-
         await client.query(`
                 INSERT INTO product (
                     product_name,
@@ -210,8 +208,6 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
              RETURNING *`,
             values
         );
-
-        // const historyProductId = randomUUID();
 
         await client.query(`
                 INSERT INTO product (

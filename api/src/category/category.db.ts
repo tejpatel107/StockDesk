@@ -89,8 +89,6 @@ export async function deleteCategoryDb(category: any, userId: string, changeLogI
                     WHERE category_id = $2
                 `, [changeLogId, category.category_id]);
 
-        // const historyCategoryId = randomUUID();
-
         await client.query(
             `INSERT INTO "category"
                 (category_name, 
@@ -110,7 +108,6 @@ export async function deleteCategoryDb(category: any, userId: string, changeLogI
 
         return {
             deletedCategoryId: category.category_id,
-            // historyCategoryId,
             changeLogId
         };
 

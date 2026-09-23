@@ -2,7 +2,7 @@ import type { UUID } from "node:crypto";
 import type { roles } from "../../db/roles.js";
 import type { NextFunction, Request, Response } from "express";
 import "dotenv/config";
-import { loginValidation, signUpValidation } from "../validators/user.validaton.js";
+import { loginValidation, signUpValidation } from "../validators/user.validation.js";
 import { verifyJwt } from "../utilities/token.js";
 import { error } from "node:console";
 
