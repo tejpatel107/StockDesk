@@ -94,8 +94,7 @@ export async function addNewProductDb(productId: string, name: string, sku: stri
 
         const res = await client.query<ProductRecord>(
             `INSERT INTO "product"
-                (product_id, 
-                product_name, 
+                (product_name, 
                 product_sku, 
                 product_price, 
                 product_stock_quantity,
@@ -103,14 +102,14 @@ export async function addNewProductDb(productId: string, name: string, sku: stri
                 flag_deleted, 
                 change_log_id, 
                 history_id)
-                VALUES ($1, $2, $3, $4, $5, $6, false, $7, NULL)
+                VALUES ($1, $2, $3, $4, $5, false, $6, NULL)
                 RETURNING
                     product_id AS "productId",
                     product_name AS "productName",
                     product_sku AS "productSku",
                     product_price AS "productPrice",
                     product_stock_quantity AS "productQuantity";`,
-            [productId, name, sku, price, quantity, category_id, changeLogId]
+            [ name, sku, price, quantity, category_id, changeLogId]
         );
 
         await client.query('COMMIT');
@@ -142,11 +141,10 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                     WHERE product_id = $2
                 `, [changeLogId, product.product_id]);
         
-        const historyProductId = randomUUID();
+        // const historyProductId = randomUUID();
 
         await client.query(`
                 INSERT INTO product (
-                    product_id,
                     product_name,
                     product_sku,
                     product_price,
@@ -155,9 +153,8 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                     flag_deleted,
                     history_id,
                     change_log_id
-                ) VALUES ( $1, $2, $3, $4, $5, $6, false, $7, $8)
-            `, [historyProductId,
-            product.product_name,
+                ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
+            `, [product.product_name,
             product.product_sku,
             product.product_price,
             product.product_stock_quantity,
@@ -170,7 +167,6 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
 
         return {
             deletedProductId: product.product_id,
-            historyProductId,
             changeLogId
         };
 
@@ -215,11 +211,10 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
             values
         );
 
-        const historyProductId = randomUUID();
+        // const historyProductId = randomUUID();
 
         await client.query(`
                 INSERT INTO product (
-                    product_id,
                     product_name,
                     product_sku,
                     product_price,
@@ -228,9 +223,8 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
                     flag_deleted,
                     history_id,
                     change_log_id
-                ) VALUES ( $1, $2, $3, $4, $5, $6, false, $7, $8)
-            `, [historyProductId,
-            product.product_name,
+                ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
+            `, [product.product_name,
             product.product_sku,
             product.product_price,
             product.product_stock_quantity,
@@ -243,7 +237,6 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
 
         return {
             product: updatedProduct,
-            historyProductId,
             changeLogId,
         };
 

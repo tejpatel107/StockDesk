@@ -1,7 +1,4 @@
 import express, { type Router, type Express, type Request, type Response } from "express";
-import authRouter from "./src/auth/index.js";
-import productRouter from "./src/product/index.js";
-import { authenticateJwtToken } from "./middlewares/auth.middleware.js";
 import appRouter from "./app.routes.js";
 
 const PORT: number = 8000;

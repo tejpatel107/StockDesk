@@ -5,7 +5,6 @@ import { generateJwtToken } from "../../utilities/token.js";
 import { roles } from "../../../db/roles.js";
 import { randomUUID } from "node:crypto";
 import { addNewCustomerDb } from "../customer/customer.db.js";
-import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 
 
 export async function loginService(req: Request) {
@@ -47,10 +46,10 @@ export async function loginService(req: Request) {
 
 export async function registerService(req: Request) {
 
-    const { firstName, lastName, email, password, contactNumber, address, role } = req.body;
+    const { firstName, lastName, email, password, phoneNumber, address, role } = req.body;
     let user = await getUserByEmailDb(email);
 
-    console.log(contactNumber);
+    console.log(phoneNumber);
 
     if (user) {
         return {
@@ -66,7 +65,7 @@ export async function registerService(req: Request) {
     const userId = randomUUID();
 
     if (role === roles.CUSTOMER) {
-        user = await addNewCustomerDb(randomUUID(), userId, (firstName as string).concat(lastName as string), email, phoneNumber, address, hashedPassword, roles.CUSTOMER);
+        user = await addNewCustomerDb(randomUUID(), userId, (firstName as string).concat(" ",lastName as string), email, phoneNumber, address, hashedPassword, roles.CUSTOMER);
     }
     else {
         user = await addNewUserDb(userId, firstName + " " + lastName, email, hashedPassword, role);

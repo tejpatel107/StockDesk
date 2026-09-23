@@ -1,8 +1,8 @@
 -- User records table
 CREATE TABLE IF NOT EXISTS "user" (
-	"user_id" uuid NOT NULL UNIQUE,
+	"user_id" uuid DEFAULT gen_random_uuid(),
 	"user_name" varchar(50) NOT NULL,
-	"user_email" varchar(100) NOT NULL UNIQUE,
+	"user_email" varchar(100) NOT NULL,
 	"user_password" text NOT NULL,
 	"user_role" varchar(10) NOT NULL,
 	"flag_deleted" boolean NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS "user" (
 );
 -- table for different categories of products
 CREATE TABLE IF NOT EXISTS "category" (
-	"category_id" uuid NOT NULL UNIQUE,
+	"category_id" uuid DEFAULT gen_random_uuid(),
 	"category_name" varchar(100) NOT NULL,
 	"category_description" text NOT NULL,
 	"flag_deleted" boolean NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS "category" (
 	PRIMARY KEY ("category_id")
 );
 CREATE TABLE IF NOT EXISTS "product" (
-	"product_id" uuid NOT NULL UNIQUE,
+	"product_id" uuid DEFAULT gen_random_uuid(),
 	"product_name" varchar(100) NOT NULL,
 	"product_sku" varchar(100) NOT NULL,
 	"product_price" numeric(10,0) NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS "product" (
 	PRIMARY KEY ("product_id")
 );
 CREATE TABLE IF NOT EXISTS "supplier" (
-	"supplier_id" uuid NOT NULL UNIQUE,
+	"supplier_id" uuid DEFAULT gen_random_uuid(),
 	"supplier_name" varchar(100) NOT NULL,
 	"supplier_email" varchar(100) NOT NULL,
 	"supplier_phone_number" varchar(25) NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS "supplier" (
 	PRIMARY KEY ("supplier_id")
 );
 CREATE TABLE IF NOT EXISTS "customer" (
-	"customer_id" uuid NOT NULL UNIQUE,
+	"customer_id" uuid DEFAULT gen_random_uuid(),
 	"customer_phone_number" varchar(25) NOT NULL,
 	"customer_address" text,
 	"user_id" uuid NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS "customer" (
 	PRIMARY KEY ("customer_id")
 );
 CREATE TABLE IF NOT EXISTS "order" (
-	"order_id" uuid NOT NULL UNIQUE,
+	"order_id" uuid DEFAULT gen_random_uuid(),
 	"customer_id" uuid NOT NULL,
 	"order_date" date NOT NULL,
 	"order_created_at" time without time zone NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS "order" (
 	PRIMARY KEY ("order_id")
 );
 CREATE TABLE IF NOT EXISTS "order_item" (
-	"order_item_id" uuid NOT NULL UNIQUE,
+	"order_item_id" uuid DEFAULT gen_random_uuid(),
 	"order_id" uuid NOT NULL,
 	"product_id" uuid NOT NULL,
 	"order_item_quantity" integer NOT NULL,
@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS "product_supplier" (
 	PRIMARY KEY ("product_id", "supplier_id")
 );
 CREATE TABLE IF NOT EXISTS "change_log" (
-	"change_log_id" uuid NOT NULL UNIQUE,
+	"change_log_id" uuid,
 	"user_id" uuid NOT NULL,
 	"change_log_timestamp" timestamp with time zone NOT NULL,
 	PRIMARY KEY ("change_log_id")
 );
-ALTER TABLE "user" ADD CONSTRAINT "user_fk7" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id");
+ALTER TABLE "user" ADD CONSTRAINT "user_fk7" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id") DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE "category" ADD CONSTRAINT "category_fk5" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id");
 ALTER TABLE "product" ADD CONSTRAINT "product_fk5" FOREIGN KEY ("category_id") REFERENCES "category"("category_id");
 ALTER TABLE "product" ADD CONSTRAINT "product_fk8" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id");
@@ -97,6 +97,6 @@ ALTER TABLE "order_item" ADD CONSTRAINT "order_item_fk1" FOREIGN KEY ("order_id"
 ALTER TABLE "order_item" ADD CONSTRAINT "order_item_fk2" FOREIGN KEY ("product_id") REFERENCES "product"("product_id");
 ALTER TABLE "product_supplier" ADD CONSTRAINT "product_supplier_fk0" FOREIGN KEY ("product_id") REFERENCES "product"("product_id");
 ALTER TABLE "product_supplier" ADD CONSTRAINT "product_supplier_fk1" FOREIGN KEY ("supplier_id") REFERENCES "supplier"("supplier_id");
-ALTER TABLE "change_log" ADD CONSTRAINT "change_log_fk1" FOREIGN KEY ("user_id") REFERENCES "user"("user_id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "change_log" ADD CONSTRAINT "change_log_fk1" FOREIGN KEY ("user_id") REFERENCES "user"("user_id") ;
 COMMENT ON TABLE "user" IS 'User records table';
 COMMENT ON TABLE "category" IS 'table for different categories of products';

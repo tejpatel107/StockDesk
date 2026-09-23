@@ -1,10 +1,10 @@
-import express, { type Router, type Express, type Request, type Response } from "express";
-import { login, signup } from "./auth.controller.js";
+import express, { type Router } from "express";
+import { loginController, signupController } from "./auth.controller.js";
 import { validateLoginRequest, validateSingUpRequest } from "../../middlewares/auth.middleware.js";
 
 const authRouter : Router = express.Router();
 
-authRouter.post("/login", validateLoginRequest, login);
-authRouter.post("/signup", validateSingUpRequest, signup);
+authRouter.post("/login", validateLoginRequest, loginController);
+authRouter.post("/signup", validateSingUpRequest, signupController);
 
 export default authRouter;

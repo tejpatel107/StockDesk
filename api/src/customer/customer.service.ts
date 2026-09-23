@@ -1,6 +1,8 @@
 import type { Request } from "express";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
-import { getAllCustomersDb, getCustomerByIdDb, getCustomerByPhoneNumberOrEmailOrNameDb } from "./customer.db.js";
+import { deleteCustomerDb, getAllCustomersDb, getCustomerByIdDb, getCustomerByPhoneNumberOrEmailOrNameDb, updateCustomerDetailsInCustomerTableDb, updateCustomerDetailsInUserTableDb } from "./customer.db.js";
+import { pool } from "../../../db/db.js";
+import { getUserByIdDb } from "../auth/auth.db.js";
 
 type CustomerUpdate = Partial<{
     name: string,
@@ -65,66 +67,91 @@ export async function getCustomerByPhoneNumberOrEmailOrNameService(req: Request)
 }
 
 
-// export async function updateCustomerService(req: Request) {
-//     const userId: string = req.user?.userId;
-//     const { id } = req.params;
-//     const fields = req.body;
+export async function updateCustomerService(req: Request) {
+    const userId: string = req.user?.userId;
+    const { id: customerId } = req.params;
+    const updates = req.body as CustomerUpdate;
+    const client = await pool.connect();
 
-//     try {
+    try {
 
-//         let customer = await getCustomerByIdDb(id as string);
+        let customer = await getCustomerByIdDb(customerId as string);
+        if (!customer) {
+            throw new Error("Customer does not exist, Please try to update existing Customer!");
+        }
 
-//         if (!customer) {
-//             throw new Error("Customer does not exist, Please try to update existing Customer!");
-//         }
+        let user = await getUserByIdDb(userId as string);
+        if (!user) {
+            throw new Error("No user details found for the customer! Contact support.");
+        }
 
-//         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
+        const customerKeys = Object.keys(updates).filter((key): key is CustomerKey => {
+            return Object.hasOwn(customerFieldMap, key) && updates[key as CustomerKey] !== undefined && updates[key as CustomerKey] !== null
+        });
 
+        const userKeys = Object.keys(updates).filter((key): key is UserKey => {
+            return Object.hasOwn(userFieldMap, key) && updates[key as UserKey] !== undefined && updates[key as UserKey] !== null
+        });
 
-//         customer = await updateCustomerDb(customer, userId, fields, changeLogId);
+        if (customerKeys.length === 0 && userKeys.length === 0) {
+            throw new Error("No valid updates provided for updates!");
+        }
 
-//         return {
-//             statusCode: 200,
-//             data: customer
-//         };
-//     } catch (error) {
-//         return {
-//             statusCode: 500,
-//             data: {
-//                 error: (error as any).message
-//             }
-//         };
-//     }
-// }
+        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
 
-// export async function addNewCustomerService(req: Request) {
+        await client.query('BEGIN');
 
-//     const { name, phoneNumber, email, address } = req.body;
-//     const userId: string = req.user?.userId;
+        if (customerKeys.length > 0) {
 
-//     try {
+            const customerUpdateValues = [changeLogId,
+                ...customerKeys.map((key) => updates[key]),
+                customerId];
 
-//         let [customer] = await getCustomerByPhoneNumberOrEmailOrNameDb(phoneNumber);
+            const customerUpdateSetClause = [
+                `change_log_id = $1`,
+                ...customerKeys.map((key, index) => `${customerFieldMap[key]} = $${index + 2}`)
+            ].join(", ");
 
-//         if (customer.phone_number === phoneNumber) {
-//             throw error("Customer already exists");
-//         }
+            console.log(customerKeys, customerUpdateValues, customerUpdateSetClause);
 
-//         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-//         customer = await addNewCustomerDb(randomUUID(), name, , userId, changeLogId);
-//         return {
-//             statusCode: 201,
-//             data: { customer }
-//         };
-//     } catch (error) {
-//         return {
-//             statusCode: 500,
-//             data: {
-//                 error: (error as any).message
-//             }
-//         };
-//     }
-// }
+            customer = await updateCustomerDetailsInCustomerTableDb(client, customerUpdateSetClause, customerUpdateValues, customer, userId, changeLogId);
+        }
+
+        if (userKeys.length > 0) {
+
+            const userUpdateValues = [changeLogId,
+                ...userKeys.map((key) => updates[key]),
+                userId];
+
+            const userUpdateSetClause = [
+                `change_log_id = $1`,
+                ...userKeys.map((key, index) => `${userFieldMap[key]} = $${index + 2}`)
+            ].join(", ");
+
+            console.log(userKeys, userUpdateValues, userUpdateSetClause);
+
+            user = await updateCustomerDetailsInUserTableDb(client, userUpdateSetClause, userUpdateValues, user, userId, changeLogId);
+        }
+
+        await client.query('COMMIT');
+
+        return {
+            statusCode: 200,
+            data: { ...customer, ...user }
+        };
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        return {
+            statusCode: 500,
+            data: {
+                error: error.message
+            }
+        };
+    } finally {
+        await client.release();
+    }
+}
 
 export async function deleteCustomerService(req: Request) {
 
@@ -133,18 +160,19 @@ export async function deleteCustomerService(req: Request) {
 
     try {
 
-        let Customer = await getCustomerByIdDb(id as string);
+        let customer = await getCustomerByIdDb(id as string);
 
-        if (!Customer) {
-            throw new Error("Customer not found!");
+        if (!customer) {
+            throw new Error("Customer does not exist!");
         }
 
         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-        Customer = await deleteCustomerDb(Customer, userId, changeLogId);
-        console.log(Customer);
+        console.log(customer.customer_phone_number);
 
-        if (!Customer) {
-            throw error("Error deleting Customer.");
+        customer = await deleteCustomerDb(customer, userId, changeLogId);
+
+        if (!customer) {
+            throw Error("Error deleting Customer.");
         }
 
         return {

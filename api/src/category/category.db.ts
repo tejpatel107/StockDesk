@@ -47,18 +47,17 @@ export async function addNewCategoryDb(categoryId: string, name: string, descrip
 
         const res = await client.query(
             `INSERT INTO "category"
-                (category_id, 
-                category_name, 
+                (category_name, 
                 category_description,
                 flag_deleted, 
                 change_log_id, 
                 history_id)
-                VALUES ($1, $2, $3, false, $4, NULL)
+                VALUES ($1, $2, false, $3, NULL)
                 RETURNING
                     category_id AS "categoryId",
                     category_name AS "categoryName",
                     category_description AS "cetgoryDescription";`,
-            [categoryId, name, description, changeLogId]
+            [name, description, changeLogId]
         );
 
         await client.query('COMMIT');
@@ -90,29 +89,28 @@ export async function deleteCategoryDb(category: any, userId: string, changeLogI
                     WHERE category_id = $2
                 `, [changeLogId, category.category_id]);
 
-        const historyCategoryId = randomUUID();
+        // const historyCategoryId = randomUUID();
 
         await client.query(
             `INSERT INTO "category"
-                (category_id, 
-                category_name, 
+                (category_name, 
                 category_description,
                 flag_deleted, 
                 change_log_id, 
                 history_id)
-                VALUES ($1, $2, $3, false, $4, $5)
+                VALUES ($1, $2,false, $3, $4)
                 RETURNING
                     category_id AS "categoryId",
                     category_name AS "categoryName",
                     category_description AS "cetgoryDescription";`,
-            [historyCategoryId, category.category_name, category.category_description, category.change_log_id, category.category_id]
+            [category.category_name, category.category_description, category.change_log_id, category.category_id]
         );
 
         await client.query('COMMIT');
 
         return {
             deletedCategoryId: category.category_id,
-            historyCategoryId,
+            // historyCategoryId,
             changeLogId
         };
 
@@ -162,18 +160,17 @@ export async function updateCategoryDb(category: any, userId: string, updates: C
 
         await client.query(
             `INSERT INTO "category"
-                (category_id, 
-                category_name, 
+                (category_name, 
                 category_description,
                 flag_deleted, 
                 change_log_id, 
                 history_id)
-                VALUES ($1, $2, $3, false, $4, $5)
+                VALUES ($1, $2, false, $3, $4)
                 RETURNING
                     category_id AS "categoryId",
                     category_name AS "categoryName",
                     category_description AS "cetgoryDescription";`,
-            [historyCategoryId, category.category_name, category.category_description, category.change_log_id, category.category_id]
+            [category.category_name, category.category_description, category.change_log_id, category.category_id]
         );
 
         await client.query("COMMIT");

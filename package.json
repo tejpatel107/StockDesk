@@ -9,7 +9,7 @@
     "dev": "tsx watch api/index.ts",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "create:db": "bash scripts/migrate-db.sh",
+    "migrate": "bash scripts/migrate-db.sh",
     "seed": "tsx scripts/seed.ts"
   },
   "author": "Tej Patel",

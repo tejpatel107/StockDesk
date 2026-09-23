@@ -17,10 +17,22 @@ const passwordValidation = z.string()
         message: "Password must contain at least one special character",
     });
 
+const addressValidation = z.object({
+    unitNumber : z.number().optional(),
+    streetNumber : z.number().optional(),
+    street: z.string(),
+    city: z.string(),
+    state: z.string(),
+    postalCode: z.string(),
+    country: z.string()
+});
+
 export const signUpValidation = z.object({
     email: z.email(),
     firstName: z.string(),
     lastName: z.string(),
+    phoneNumber : z.e164(),
+    address: addressValidation.optional(),
     role: z.enum(roles),
     password: passwordValidation
 });

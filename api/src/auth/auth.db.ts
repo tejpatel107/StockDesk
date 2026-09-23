@@ -25,14 +25,34 @@ export async function getUserByEmailDb(email: string): Promise<UserRecord | unde
     }
 }
 
-export async function addNewUserDb(userId: string, name: string, email: string, password: string, role: roles): Promise<UserRecord | undefined> {
+export async function getUserByIdDb(userId: string) {
+    let query = `
+        SELECT * FROM "user" 
+        WHERE user_id = $1 AND flag_deleted = false;
+    `
+    return (await pool.query(query,[userId])).rows[0];
+}
 
+export async function addNewUserDb(userId: string, name: string, email: string, password: string, role: roles): Promise<UserRecord | undefined> {
 
     const client = await pool.connect();
     try {
 
         await client.query('BEGIN');
         await client.query('SET CONSTRAINTS ALL DEFERRED');
+
+        const { rows : [ user ] } = await client.query(
+            `INSERT INTO "user"
+            (user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
+            VALUES ($1, $2, $3, $4, $5, false, NULL)
+            RETURNING
+                user_id AS "userId",
+                user_name AS "userName",
+                user_email AS "email",
+                user_role AS "userRole",
+                change_log_id AS "changeLogId";`,
+            [name, email, password, role, randomUUID()]
+        );
 
         const { rows : [ changeLog ] } = await client.query(`
             INSERT INTO change_log (
@@ -42,23 +62,11 @@ export async function addNewUserDb(userId: string, name: string, email: string, 
             ) VALUES ( $1, $2, now())
             RETURNING *           
             `,
-            [randomUUID(), userId]
-        );
-
-        const res = await client.query<UserRecord>(
-            `INSERT INTO "user"
-            (user_id, user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
-            VALUES ($1, $2, $3, $4, $5, $6, false, NULL)
-            RETURNING
-                user_id AS "userId",
-                user_name AS "userName",
-                user_email AS "email",
-                user_role AS "userRole";`,
-            [userId, name, email, password, role, changeLog.change_log_id]
+            [user.changeLogId, user.userId]
         );
 
         await client.query('COMMIT');
-        return res.rows[0];
+        return user;
 
     } catch (error) {
         await client.query('ROLLBACK');

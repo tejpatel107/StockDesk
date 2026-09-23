@@ -57,20 +57,19 @@ export async function addNewSupplierDb(supplierId: string, name: string, email: 
 
         const res = await client.query(
             `INSERT INTO "supplier"
-                (supplier_id, 
-                supplier_name, 
+                (supplier_name, 
                 supplier_email,
                 supplier_phone_number,
                 flag_deleted, 
                 change_log_id, 
                 history_id)
-                VALUES ($1, $2, $3, $4, false, $5, NULL)
+                VALUES ($1, $2, $3, false, $4, NULL)
                 RETURNING
                     supplier_id AS "supplierId",
                     supplier_name AS "supplierName",
                     supplier_email AS "supplierEmail",
                     supplier_phone_number AS "supplierPhoneNumber";`,
-            [supplierId, name, email, phoneNumber, changeLogId]
+            [name, email, phoneNumber, changeLogId]
         );
 
         await client.query('COMMIT');
@@ -102,20 +101,18 @@ export async function deleteSupplierDb(supplier: any, userId: string, changeLogI
                     WHERE supplier_id = $2
                 `, [changeLogId, supplier.supplier_id]);
 
-        const historySupplierId = randomUUID();
+        // const historySupplierId = randomUUID();
 
         await client.query(`
                 INSERT INTO supplier (
-                    supplier_id,
                     supplier_name,
                     supplier_email,
                     supplier_phone_number,
                     flag_deleted,
                     history_id,
                     change_log_id
-                ) VALUES ( $1, $2, $3, $4, false, $5, $6)
-            `, [historySupplierId,
-            supplier.supplier_name,
+                ) VALUES ( $1, $2, $3, false, $4, $5)
+            `, [supplier.supplier_name,
             supplier.supplier_email,
             supplier.supplier_phone_number,
             supplier.supplier_id,
@@ -126,7 +123,6 @@ export async function deleteSupplierDb(supplier: any, userId: string, changeLogI
 
         return {
             deletedSupplierId: supplier.supplier_id,
-            historySupplierId,
             changeLogId
         };
 
@@ -173,20 +169,18 @@ export async function updateSupplierDb(supplier: any, userId: string, updates: S
             values
         );
 
-        const historySupplierId = randomUUID();
+        // const historySupplierId = randomUUID();
 
         await client.query(`
                 INSERT INTO supplier (
-                    supplier_id,
                     supplier_name,
                     supplier_email,
                     supplier_phone_number,
                     flag_deleted,
                     history_id,
                     change_log_id
-                ) VALUES ( $1, $2, $3, $4, false, $5, $6)
-            `, [historySupplierId,
-            supplier.supplier_name,
+                ) VALUES ( $1, $2, $3, false, $4, $5)
+            `, [supplier.supplier_name,
             supplier.supplier_email,
             supplier.supplier_phone_number,
             supplier.supplier_id,
