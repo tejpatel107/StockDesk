@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { roles } from "../../db/roles.js";
+import { personNameValidationSchema } from "./common.validation.js";
 
 const passwordValidation = z.string()
     .min(8, { message: "Password must be at least 8 characters long" })
@@ -18,8 +19,8 @@ const passwordValidation = z.string()
     });
 
 const addressValidation = z.object({
-    unitNumber : z.number().optional(),
-    streetNumber : z.number().optional(),
+    unitNumber: z.number().optional(),
+    streetNumber: z.number().optional(),
     street: z.string(),
     city: z.string(),
     state: z.string(),
@@ -27,17 +28,32 @@ const addressValidation = z.object({
     country: z.string()
 });
 
+const roleSchema = z.preprocess(
+    (value) => (typeof value === "string" ? value.toUpperCase() : value),
+    z.enum(roles)
+);
+
 export const signUpValidation = z.object({
     email: z.email(),
-    firstName: z.string(),
-    lastName: z.string(),
-    phoneNumber : z.e164(),
+    firstName: personNameValidationSchema,
+    lastName: personNameValidationSchema,
+    phoneNumber: z.e164(),
     address: addressValidation.optional(),
-    role: z.enum(roles),
+    role: roleSchema,
     password: passwordValidation
 });
 
 export const loginValidation = z.object({
     email: z.email(),
     password: passwordValidation
+});
+
+// since sign up validation schema handles validation for adding customer,
+// so only need a validation schema for updating customer details,
+// thus added with users' validation schemas 
+export const updateCustomerDetailsValidationSchema = z.object({
+    name: personNameValidationSchema.optional(),
+    email: z.email().optional(),
+    phoneNumer: z.e164().optional(),
+    address: addressValidation.optional()
 });

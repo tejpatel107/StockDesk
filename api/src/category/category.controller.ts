@@ -8,11 +8,11 @@ export async function getCategoriesController(req: Request, res: Response) {
         return await getCategoryByName(req, res);
     } 
 
-    return await getAllCategory(req, res);
+    return await getAllCategories(req, res);
 
 }
 
-async function getAllCategory(req: Request, res: Response) {
+async function getAllCategories(req: Request, res: Response) {
     const result = await getAllCategoriesService();
     return res.status(result?.statusCode as number).json(result?.data);
 };

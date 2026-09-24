@@ -3,6 +3,7 @@ import { getAllCategoriesDb, addNewCategoryDb, deleteCategoryDb, updateCategoryD
 import { error } from "node:console";
 import { randomUUID } from "node:crypto";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
+import { NotFoundError } from "../../utilities/globalErrorHandlers.js";
 
 export async function getAllCategoriesService() {
 
@@ -29,7 +30,7 @@ export async function getCategoryByNameService(req: Request) {
     const { search } = req.query;
     console.log(search);
     try {
-        const categories = await getCategoryByNameDb((search as string).trim());
+        const categories = await getCategoryByNameDb(search as string);
         return {
             statusCode: 200,
             data: { count: categories.length, categories }
@@ -56,8 +57,8 @@ export async function addNewCategoryService(req: Request) {
 
         let category = await getCategoryByNameDb(name);
 
-        if (category.name === name) {
-            throw error("Category already exists");
+        if (category && category.name === name) {
+            throw new Error(`Category by name ${category.name} already exist!`);
         }
 
         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
@@ -68,9 +69,9 @@ export async function addNewCategoryService(req: Request) {
         };
     } catch (error) {
         return {
-            statusCode: 500,
+            statusCode: 409,
             data: {
-                error: (error as any).message
+                error: error.message
             }
         };
     }
@@ -81,34 +82,23 @@ export async function deleteCategoryService(req: Request) {
     const userId: string = req.user?.userId;
     const { id } = req.params;
 
-    try {
+    let category = await getCategoryByIdDb(id as string);
 
-        let category = await getCategoryByIdDb(id as string);
-
-        if (!category) {
-            throw new Error("Category not found!");
-        }
-
-        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-        category = await deleteCategoryDb(category, userId, changeLogId);
-        console.log(category);
-
-        if (!category) {
-            throw error("Error deleting category.");
-        }
-
-        return {
-            statusCode: 204,
-        };
-
-    } catch (error: any) {
-        return {
-            statusCode: 500,
-            data: {
-                error: error.message
-            }
-        };
+    if (!category) {
+        throw new NotFoundError("Category not found!");
     }
+
+    const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
+    category = await deleteCategoryDb(category, userId, changeLogId);
+    console.log(category);
+
+    if (!category) {
+        throw error("Error deleting category.");
+    }
+
+    return {
+        statusCode: 204,
+    };
 }
 
 export async function updateCategoryService(req: Request) {

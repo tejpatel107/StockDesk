@@ -31,10 +31,10 @@ export async function getCategoryByIdDb(categotyId: string) {
 
 export async function getCategoryByNameDb(value: string) {
     let query = `
-        SELECT * FROM "category"
+        SELECT category_name AS name FROM "category"
         WHERE (category_name ILIKE $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [`%${value}%`])).rows;
+    return (await pool.query(query, [`%${value}%`])).rows[0];
 }
 
 export async function addNewCategoryDb(categoryId: string, name: string, description: string, userId: string, changeLogId: string) {

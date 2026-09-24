@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS "product" (
 	"product_id" uuid DEFAULT gen_random_uuid(),
 	"product_name" varchar(100) NOT NULL,
 	"product_sku" varchar(100) NOT NULL,
-	"product_price" numeric(10,0) NOT NULL,
+	"product_price" numeric(10,2) NOT NULL,
 	"product_stock_quantity" integer NOT NULL,
 	"category_id" uuid NOT NULL, 
 	"flag_deleted" boolean NOT NULL,
