@@ -1,20 +1,10 @@
-import { countOrders, findOrders, OrderFilters } from "../db/orders.queries.js";
-import { getOrdersQuerySchema } from "../schemas/orders.schema.js";
-
-export class ValidationError extends Error {
-    details: unknown;
-
-    constructor(details: unknown) {
-        super("invalid query params");
-        this.name = "ValidationError";
-        this.details = details;
-    }
-}
+import type { Request } from "express";
+import { ValidationError } from "../../utilities/globalErrorHandlers.js";
+import { getOrdersQuerySchema } from "../../validators/order.validation.js";
+import { getOrderByIdDb, getOrdersDb } from "./order.db.js";
 
 export interface OrderDTO {
-    orderId: string;
     orderDate: string;
-    orderCreatedAt: string;
     status: string;
     totalAmount: string;
     customerName: string;
@@ -31,53 +21,62 @@ export interface PaginatedOrders {
     };
 }
 
-export async function getOrders(rawQuery: unknown): Promise<PaginatedOrders | any> {
+export async function getOrdersService(req: Request): Promise<PaginatedOrders | any> {
 
-    try {
-        const parsed = getOrdersQuerySchema.safeParse(rawQuery);
+    const parsed = getOrdersQuerySchema.safeParse(req.query);
 
-        if (!parsed.success) {
-            throw new ValidationError(parsed.error.flatten());
+    if (!parsed.success) {
+        throw new ValidationError(
+            parsed.error.issues.map((issue) => ({
+                location: "params",
+                field: issue.path.join("."),
+                message: issue.message,
+            }))
+        );
+    }
+
+    console.log(parsed.data);
+
+    const { page, pageSize, status, startDate, endDate, sort } = parsed.data;
+
+    const whereClause: string[] = ["o.history_id is NULL", "o.flag_deleted = false"];
+    const params = [];
+
+    if (status) {
+        params.push(status);
+        whereClause.push(`o.order_status = $${params.length}`);
+    }
+    if (startDate) {
+        params.push(startDate);
+        whereClause.push(`o.order_date >= $${params.length}`);
+    }
+    if (endDate) {
+        params.push(endDate);
+        whereClause.push(`o.order_date <= $${params.length}`);
+    }
+
+    console.log(whereClause.join(" AND "));
+    console.log(params);
+
+    params.push(pageSize, (page - 1) * pageSize);
+    const limitIndex = params.length - 1;
+    const offsetIndex = params.length;
+
+    const { rows: orders } = (await getOrdersDb(params, whereClause.join(" AND "), limitIndex, offsetIndex, sort)); 
+    return {
+        statusCode: 200,
+        data: {
+            count: orders.length,
+            orders
         }
-        const query = parsed.data;
+    }
+}
 
-        const filters: OrderFilters = {
-            status: query.status,
-            startDate: query.startDate,
-            endDate: query.endDate,
-        };
-        const offset = (query.page - 1) * query.pageSize;
+export async function getOrderByIdService(req: Request) {
+    const { id } = req.params;
 
-        const [total, rows] = await Promise.all([
-            countOrders(filters),
-            findOrders(filters, query.pageSize, offset),
-        ]);
-
-        const orders: OrderDTO[] = rows.map((row: any) => ({
-            orderId: row.order_id,
-            orderDate: row.order_date,
-            orderCreatedAt: row.order_created_at,
-            status: row.order_status,
-            totalAmount: row.order_total_amount,
-            customerName: row.customer_name,
-            itemCount: parseInt(row.item_count, 10),
-        }));
-
-        return {
-            orders,
-            pagination: {
-                page: query.page,
-                pageSize: query.pageSize,
-                total,
-                totalPages: Math.ceil(total / query.pageSize),
-            },
-        };
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
+    return { 
+        statusCode: 200,
+        data: await getOrderByIdDb(id)
     }
 }
