@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS "customer" (
 CREATE TABLE IF NOT EXISTS "order" (
 	"order_id" uuid DEFAULT gen_random_uuid(),
 	"customer_id" uuid NOT NULL,
-	"order_date" date NOT NULL,
-	"order_created_at" time without time zone NOT NULL,
+	"order_date" date NOT NULL DEFAULT CURRENT_DATE,
+	"order_created_at" time with time zone NOT NULL DEFAULT CURRENT_TIME ,
 	"order_status" varchar(15) NOT NULL,
 	"order_total_amount" numeric(10,2) NOT NULL,
 	"flag_deleted" boolean NOT NULL,

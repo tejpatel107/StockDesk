@@ -35,12 +35,16 @@ export async function getAllProductsDb() {
     return (await pool.query(query)).rows;
 }
 
-export async function getProductByIdDb(productId: string) {
-    let query = `
-        SELECT * FROM "product"
-        WHERE product_id = $1 AND (flag_deleted = false);
+export async function getProductByIdsDb(productIds: string[]) {
+    const query = `
+        SELECT 
+            product_id,
+            product_price,
+            product_stock_quantity AS product_quantity
+        FROM "product"
+        WHERE product_id = ANY($1::uuid[]) AND flag_deleted = false AND history_id IS NULL;
     `;
-    return (await pool.query(query, [productId])).rows[0];
+    return (await pool.query(query, [productIds]));
 }
 
 export async function getProductsByNameOrSkuDb(value: string) {

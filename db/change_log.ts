@@ -10,7 +10,7 @@ export async function insertNewChangeLogRecord(userId: string) {
                 change_log_id,
                 user_id,
                 change_log_timestamp
-            ) VALUES ( $1, $2, now())
+            ) VALUES ($1, $2, now())
             RETURNING *           
             `,
         [changeLogId, userId]

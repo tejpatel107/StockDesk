@@ -1,4 +1,7 @@
-import { z } from "zod";
+import { number, uuid, z } from "zod";
+import { paramIdValidationSchema } from "./common.validation.js";
+
+export const orderParamIdValidationSchema = paramIdValidationSchema("id");
 
 export enum ORDER_STATUSES {
     PENDING = "PENDING",
@@ -21,5 +24,17 @@ export const getOrdersQuerySchema = z
         (data) => !data.startDate || !data.endDate || data.startDate <= data.endDate,
         { message: "start date must be before or equal to end date", path: ["startDate"] }
     );
+
+const orderItemValidationSchema = z
+    .object({
+        productId: z.uuid(),
+        quantity: z.number().int().min(1)
+    });
+
+export const addNewOrderValidationSchema = z
+    .object({
+        customerId : uuid(),
+        items: z.array(orderItemValidationSchema)
+    });
 
 export type OrderSchema = z.infer<typeof getOrdersQuerySchema>;
