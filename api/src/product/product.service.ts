@@ -1,5 +1,5 @@
 import type { Request } from "express";
-import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, type ProductRecord, deleteProductDb, updateProductDb, getProductByIdsDb } from "./product.db.js";
+import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, type ProductRecord, deleteProductDb, updateProductDb, getProductByIdDb } from "./product.db.js";
 import { error } from "node:console";
 import { randomUUID } from "node:crypto";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
@@ -141,7 +141,7 @@ export async function deleteProductService(req: Request) {
 
     try {
 
-        let product = await getProductByIdsDb(id as string);
+        let product = await getProductByIdDb(id as string);
 
         if (!product) {
             throw new Error("Product not found!");
@@ -170,7 +170,7 @@ export async function updateProductService(req: Request) {
 
     try {
 
-        let product = await getProductByIdsDb(id as string);
+        let product = await getProductByIdDb(id as string);
 
         if (!product) {
             throw new Error("Product does not exist, Please try to update existing product!");

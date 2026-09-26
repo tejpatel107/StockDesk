@@ -6,7 +6,7 @@ export const orderParamIdValidationSchema = paramIdValidationSchema("id");
 export enum ORDER_STATUSES {
     PENDING = "PENDING",
     CONFIRMED = "CONFIRMED",
-    SHIPPING = "SHIPPED",
+    SHIPPED = "SHIPPED",
     DELIVERED = "DELIVERED",
     CANCELLED = "CANCELLED"
 }
@@ -36,5 +36,9 @@ export const addNewOrderValidationSchema = z
         customerId : uuid(),
         items: z.array(orderItemValidationSchema)
     });
+
+export const updateOrderValidationSchema = z.object({
+    status: z.enum(ORDER_STATUSES)
+});
 
 export type OrderSchema = z.infer<typeof getOrdersQuerySchema>;

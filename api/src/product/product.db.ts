@@ -35,16 +35,14 @@ export async function getAllProductsDb() {
     return (await pool.query(query)).rows;
 }
 
-export async function getProductByIdsDb(productIds: string[]) {
+export async function getProductByIdDb(productId: string) {
     const query = `
         SELECT 
-            product_id,
-            product_price,
-            product_stock_quantity AS product_quantity
+            *
         FROM "product"
-        WHERE product_id = ANY($1::uuid[]) AND flag_deleted = false AND history_id IS NULL;
+        WHERE product_id = $1 AND flag_deleted = false AND history_id IS NULL;
     `;
-    return (await pool.query(query, [productIds]));
+    return (await pool.query(query, [productId]));
 }
 
 export async function getProductsByNameOrSkuDb(value: string) {
@@ -113,7 +111,7 @@ export async function addNewProductDb(productId: string, name: string, sku: stri
                     product_sku AS "productSku",
                     product_price AS "productPrice",
                     product_stock_quantity AS "productQuantity";`,
-            [ name, sku, price, quantity, category_id, changeLogId]
+            [name, sku, price, quantity, category_id, changeLogId]
         );
 
         await client.query('COMMIT');
@@ -144,7 +142,7 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                         change_log_id = $1
                     WHERE product_id = $2
                 `, [changeLogId, product.product_id]);
-        
+
         await client.query(`
                 INSERT INTO product (
                     product_name,
@@ -157,12 +155,12 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                     change_log_id
                 ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
             `, [product.product_name,
-            product.product_sku,
-            product.product_price,
-            product.product_stock_quantity,
-            product.category_id,
-            product.product_id,
-            product.change_log_id
+        product.product_sku,
+        product.product_price,
+        product.product_stock_quantity,
+        product.category_id,
+        product.product_id,
+        product.change_log_id
         ]);
 
         await client.query('COMMIT');
@@ -225,12 +223,12 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
                     change_log_id
                 ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
             `, [product.product_name,
-            product.product_sku,
-            product.product_price,
-            product.product_stock_quantity,
-            product.category_id,
-            product.product_id,
-            product.change_log_id
+        product.product_sku,
+        product.product_price,
+        product.product_stock_quantity,
+        product.category_id,
+        product.product_id,
+        product.change_log_id
         ]);
 
         await client.query("COMMIT");

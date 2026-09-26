@@ -5,6 +5,7 @@ import "dotenv/config";
 import { loginValidation, signUpValidation } from "../validators/user.validation.js";
 import { verifyJwt } from "../utilities/token.js";
 import { error } from "node:console";
+import { ValidationError } from "./validate.middleware.js";
 
 const jwtSecret =  process.env.JWT_SECRET_KEY || " ";
 
@@ -50,19 +51,21 @@ export async function authenticateJwtToken(req: AuthenticatedRequest, res: Respo
 
 }
 
-export function validateSingUpRequest(req: Request, res: Response, next: NextFunction) {
+// export function validateSingUpRequest(req: Request, res: Response, next: NextFunction) {
 
-    const result = signUpValidation.safeParse(req.body);
+//     const result = signUpValidation.safeParse(req.body);
 
-    if (result.error) {
-        return res.status(400).json({
-            error : result.error
-        });
-    }
+//     if (result.error) {
+//         const [issue] = result.error.issues
+//         next(new ValidationError([{
+//             location : issue?.path,
 
-    req.body = result.data;
-    next();
-}
+//         }]))
+//     }
+
+//     req.body = result.data;
+//     next();
+// }
 
 export function validateLoginRequest(req: Request, res: Response, next: NextFunction) {
 

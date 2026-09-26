@@ -1,10 +1,10 @@
 import type { Request } from "express";
 import { AppError, ValidationError } from "../../utilities/globalErrorHandlers.js";
 import { getOrdersQuerySchema, ORDER_STATUSES } from "../../validators/order.validation.js";
-import { addOrderItems, createNewOrderDb, getOrderByIdDb, getOrdersDb, updateProductQuantityDb } from "./order.db.js";
+import { addOrderItems, changeOrderStatusDb, createNewOrderDb, getOrderByIdDb, getOrderByIdForCustomerDb, getOrdersDb, getProductsDb, updateProductQuantityDb } from "./order.db.js";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
-import { getProductByIdsDb } from "../product/product.db.js";
+import { getProductByIdDb } from "../product/product.db.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 
 export interface OrderDTO {
@@ -39,8 +39,6 @@ export async function getOrdersService(req: Request): Promise<PaginatedOrders | 
         );
     }
 
-    console.log(parsed.data);
-
     const { page, pageSize, status, startDate, endDate, sort } = parsed.data;
 
     const whereClause: string[] = ["o.history_id is NULL", "o.flag_deleted = false"];
@@ -73,19 +71,43 @@ export async function getOrdersService(req: Request): Promise<PaginatedOrders | 
     }
 }
 
-export async function getOrderByIdService(req: Request) {
+export async function getOrderByIdForCustomerService(req: Request) {
 
     const userId = req.user?.userId;
     const { id: orderId } = req.params;
 
-    const order = (await getOrderByIdDb(userId, orderId as string)).rows[0];
+    try {
+        const { rows: orderItems } = (await getOrderByIdForCustomerDb(userId, orderId as string));
 
-    return {
-        statusCode: 200,
-        data: {
-            order
+        console.log(orderItems);
+
+        if (orderItems.length === 0) {
+            throw new AppError(`No order found for id: ${orderId}`);
         }
+
+        const { order_id, customer_name, order_status, order_date, order_total_amount } = orderItems[0];
+
+        const res = {
+            "order id": order_id,
+            "customer name": customer_name,
+            "order status": order_status,
+            "order date": order_date,
+            "order total amount": order_total_amount,
+            "order items": orderItems.map(oi => ({
+                "order item id": oi.order_item_id,
+                "product id": oi.product_id,
+                "product name": oi.product_name,
+            }))
+        };
+
+        return {
+            statusCode: 200,
+            data: res
+        }
+    } catch (error) {
+        throw new AppError((error as AppError).message, 500)
     }
+
 }
 
 export async function createNewOrderService(req: Request) {
@@ -93,15 +115,16 @@ export async function createNewOrderService(req: Request) {
     const { customerId, items } = req.body;
     const userId = req.user?.userId;
 
-    const itemsMap = new Map(
-        items.map((item: { productId: any; quantity: any; }) => [item.productId, item.quantity])
+    const itemsMap = new Map<string, number>(
+        items.map((item: { productId: string; quantity: number; }) => [item.productId, item.quantity])
     );
-    console.log(itemsMap);
     const client = await pool.connect();
 
     try {
 
-        const { rows: products } = await getDesiredProducts(items);
+        await client.query('BEGIN');
+
+        const { rows: products } = await getDesiredProducts(client, items);
 
         await areProductsInStock(products, itemsMap);
 
@@ -111,13 +134,15 @@ export async function createNewOrderService(req: Request) {
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
 
-        await client.query('BEGIN');
+        const updateProductQuantities = new Map(
+            products.map(product => [product.product_id, product.product_quantity - itemsMap.get(product.product_id)])
+        );
 
         const { rows: [order] } = await createNewOrderDb(client, customerId, ORDER_STATUSES.PENDING, orderTotal, changeLog.change_log_id);
 
         await addOrderItems(client, order.orderId, products, itemsMap, lineTotals);
 
-        await updateProductQuantityDb(client, changeLog.change_log_id, products, itemsMap);
+        await updateProductQuantityDb(client, changeLog.change_log_id, products, updateProductQuantities);
 
         await client.query('COMMIT');
 
@@ -137,9 +162,9 @@ export async function createNewOrderService(req: Request) {
 
 }
 
-async function getDesiredProducts(items: any[]) {
+async function getDesiredProducts(client: PoolClient, items: any[]) {
     const ids: string[] = items.map(item => item.productId);
-    return await getProductByIdsDb(ids);
+    return await getProductsDb(client, ids);
 }
 
 async function calculateLineTotalForProducts(products: any[], items: Map<any, any>) {
@@ -161,4 +186,90 @@ async function areProductsInStock(products: any[], items: Map<any, any>) {
         throw new Error(`Not enough stock for products: ${ids.join(", ")}`);
     }
 
+}
+
+export async function updateOrderService(req: Request) {
+
+    const { status } = req.body;
+    const { id: orderId } = req.params;
+    const userId = req.user?.userId;
+
+    const { rows: orderItems } = await getOrderByIdDb(orderId as string);
+
+    console.log(orderItems);
+
+    if (orderItems.length === 0) {
+        throw new AppError(`order for order_id: ${orderId} does not exist!`);
+    }
+
+    const order = orderItems[0];
+
+    if (order.order_status === ORDER_STATUSES.CANCELLED) {
+        throw new AppError("ordered is already canceled! Can't process or change the status of canceled orders.");
+    }
+
+    if (order.order_status === ORDER_STATUSES.DELIVERED) {
+        throw new AppError("ordered is already delivered! Can't process delivered orders further.");
+    }
+
+    if (order.order_status === ORDER_STATUSES.SHIPPED && status !== ORDER_STATUSES.DELIVERED) {
+        throw new AppError(`ordered is already shipped and ready to be delivered soon! Can't cancel the order at this time. If requested status change is not ${ORDER_STATUSES.CANCELLED} then it is invalid status transition.`);
+    }
+
+    if (order.order_status === ORDER_STATUSES.CONFIRMED
+        && (status !== ORDER_STATUSES.SHIPPED && status !== ORDER_STATUSES.CANCELLED)) {
+        throw new AppError(`Invalid transition of status. Confirmed orders can only be transitioned to ${ORDER_STATUSES.CANCELLED} or ${ORDER_STATUSES.SHIPPED} status.`);
+    }
+
+    if (order.order_status === ORDER_STATUSES.PENDING
+        && (status !== ORDER_STATUSES.CONFIRMED && status !== ORDER_STATUSES.CANCELLED)) {
+        throw new AppError(`Invalid transition of status. Pending orders can only be transitioned to ${ORDER_STATUSES.CANCELLED} or ${ORDER_STATUSES.CONFIRMED} status.`);
+    }
+
+    const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
+
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        const { rows: [updatedOrder] } = await changeOrderStatusDb(client, orderId as string, changeLog.change_log_id, status);
+
+        console.log(updatedOrder);
+
+        if (status === ORDER_STATUSES.CANCELLED) {
+
+            const currentOrderProductQuantities = new Map();
+            orderItems.forEach((item) => {
+                currentOrderProductQuantities.set(item.productId, item.quantity);
+            });
+
+            const { rows: products } = await getProductsDb(client, Array.from(currentOrderProductQuantities.keys()));
+
+            const updatedOrderProductQuantities = new Map(
+                products.map(product => [product.product_id, product.product_quantity + currentOrderProductQuantities.get(product.product_id)])
+            );
+
+            await updateProductQuantityDb(client, changeLog.change_log_id, products, updatedOrderProductQuantities);
+
+            await client.query('COMMIT');
+
+            return {
+                statusCode: 200,
+                data: updatedOrder
+            }
+        }
+
+        await client.query('COMMIT');
+
+        return {
+            statusCode: 200,
+            data: updatedOrder
+        }
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw new AppError((error as Error).message, 500);
+    } finally {
+        await client.release();
+    }
 }

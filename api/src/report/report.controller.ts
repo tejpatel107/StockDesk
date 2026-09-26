@@ -1,7 +1,8 @@
 import { type Request, type Response } from "express";
+import { getLowStockService } from "./report.service.js";
 
-async function getLowStockController(req: Request, res: Response) {
-    const result = await getLowStockService();
+export async function getLowStockController(req: Request, res: Response) {
+    const result = await getLowStockService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 };
 
