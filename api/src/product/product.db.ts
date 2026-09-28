@@ -1,6 +1,7 @@
 import { randomUUID, type UUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
+import type { ValidRow } from "./product.service.js";
 
 export interface ProductRecord {
     productId: UUID,
@@ -244,4 +245,55 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
     } finally {
         client?.release();
     }
+}
+
+export async function getProductsBySkuIfExistDb(client: PoolClient, skus: string[]) {
+
+    return client.query(
+        `SELECT product_sku FROM product
+              WHERE product_sku = ANY($1::text[])
+                AND history_id IS NULL AND flag_deleted = false`,
+        [skus]
+    );
+}
+
+export async function getProductsByCatgoryIdsDb(client: PoolClient, categoryIds: string[]) {
+
+    return client.query(
+        `SELECT product_sku FROM product
+              WHERE product_sku = ANY($1::text[])
+                AND history_id IS NULL AND flag_deleted = false`,
+        [categoryIds]
+    );
+}
+
+export async function addProductsInBulkDb(client: PoolClient, rowsToInsert: ValidRow[], userId: string) {
+
+    const { rows : [changeLog] } = await client.query(`
+                                        INSERT INTO change_log (
+                                            change_log_id,
+                                            user_id,
+                                            change_log_timestamp
+                                        ) VALUES ($1, $2, now())
+                                        RETURNING change_log_id           
+                                        `, [randomUUID(), userId]);
+
+    const rows = await client.query(
+        `INSERT INTO product
+               (product_name, product_sku, product_price,
+                product_stock_quantity, category_id, flag_deleted, history_id, change_log_id)
+             SELECT t.id, t.name, t.sku, t.price, t.qty, t.cat, false, NULL, $6::uuid
+               FROM unnest($1::text[], $2::text[], $3::numeric[], $4::int[], $5::uuid[])
+                    AS t(id, name, sku, price, qty, cat)`,
+        [
+            rowsToInsert.map((r) => r.name),
+            rowsToInsert.map((r) => r.sku),
+            rowsToInsert.map((r) => r.price),
+            rowsToInsert.map((r) => r.quantity),
+            rowsToInsert.map((r) => r.categoryId),
+            changeLog.change_log_id,
+        ]
+    );
+
+    return rows.rowCount ?? 0;
 }

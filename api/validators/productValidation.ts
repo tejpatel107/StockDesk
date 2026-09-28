@@ -16,3 +16,12 @@ export const addProductValidationSchema = z.object({
 export const updateProductValidationSchema = addProductValidationSchema
     .partial()
     .refine(atLeastOneField, AT_LEAST_ONE_FIELD);
+
+export const csvRowValidationSchema = z.object({
+    name: z.string().trim().min(1, "name is required").max(100, "name exceeds 100 characters"),
+    sku: z.string().trim().min(1, "sku is required").max(100, "sku exceeds 100 characters"),
+    // product_price is numeric(10,0) in schema.sql, so whole numbers only
+    price: z.string().trim().regex(/^\d{1,10}$/, "price must be a whole number (max 10 digits)"),
+    quantity: z.string().trim().regex(/^\d{1,9}$/, "quantity must be a non-negative integer"),
+    category_id: z.string().trim().uuid("category_id must be a valid UUID"),
+});

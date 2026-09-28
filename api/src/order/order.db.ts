@@ -152,7 +152,7 @@ export async function getProductsDb(client: PoolClient, productIds: string[]) {
         WHERE product_id = ANY($1::uuid[]) AND flag_deleted = false AND history_id IS NULL
         FOR UPDATE;
     `;
-  return (await client.query(query, [productIds]));
+  return client.query(query, [productIds]);
 }
 
 export async function createNewOrderDb(
