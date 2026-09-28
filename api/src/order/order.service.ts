@@ -4,7 +4,6 @@ import { getOrdersQuerySchema, ORDER_STATUSES } from "../../validators/order.val
 import { addOrderItems, changeOrderStatusDb, createNewOrderDb, getOrderByIdDb, getOrderByIdForCustomerDb, getOrdersDb, getProductsDb, updateProductQuantityDb } from "./order.db.js";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
-import { getProductByIdDb } from "../product/product.db.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 
 export interface OrderDTO {
@@ -124,7 +123,7 @@ export async function createNewOrderService(req: Request) {
 
         await client.query('BEGIN');
 
-        const { rows: products } = await getDesiredProducts(client, items);
+        const products = await getDesiredProducts(client, Array.from(itemsMap.keys()));
 
         await areProductsInStock(products, itemsMap);
 
@@ -162,9 +161,20 @@ export async function createNewOrderService(req: Request) {
 
 }
 
-async function getDesiredProducts(client: PoolClient, items: any[]) {
-    const ids: string[] = items.map(item => item.productId);
-    return await getProductsDb(client, ids);
+async function getDesiredProducts(client: PoolClient, reqeuestedProductIds: string[]) {
+    const { rows : products } = await getProductsDb(client, reqeuestedProductIds);
+    
+    const foundProductIds = new Set(products.map(p=>p.product_id));
+
+    const ids = reqeuestedProductIds.filter(id => !foundProductIds.has(id));
+    
+    if (ids.length > 0)
+    {
+        throw new Error(`Products does not exist for : ${Array.from(ids).join(", ")}`)
+    }
+
+    return products;
+
 }
 
 async function calculateLineTotalForProducts(products: any[], items: Map<any, any>) {
@@ -174,7 +184,7 @@ async function calculateLineTotalForProducts(products: any[], items: Map<any, an
     );
 }
 
-async function areProductsInStock(products: any[], items: Map<any, any>) {
+async function areProductsInStock(products: any[], items: Map<string, number>) {
 
     const flagedProducts = products.filter((product) => {
         const quantity = items.get(product.product_id);

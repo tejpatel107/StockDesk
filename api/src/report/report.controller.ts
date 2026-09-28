@@ -1,13 +1,13 @@
 import { type Request, type Response } from "express";
-import { getLowStockService } from "./report.service.js";
+import { getLowStockService, getTopProductsService } from "./report.service.js";
 
 export async function getLowStockController(req: Request, res: Response) {
     const result = await getLowStockService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 };
 
-async function getTopProductController(req: Request, res: Response) {
-    const result = await getTopProductService();
+export async function getTopProductsController(req: Request, res: Response) {
+    const result = await getTopProductsService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 };
 
