@@ -260,8 +260,8 @@ export async function getProductsBySkuIfExistDb(client: PoolClient, skus: string
 export async function getProductsByCatgoryIdsDb(client: PoolClient, categoryIds: string[]) {
 
     return client.query(
-        `SELECT product_sku FROM product
-              WHERE product_sku = ANY($1::text[])
+        `SELECT category_id FROM product
+              WHERE category_id = ANY($1::uuid[])
                 AND history_id IS NULL AND flag_deleted = false`,
         [categoryIds]
     );
@@ -282,9 +282,9 @@ export async function addProductsInBulkDb(client: PoolClient, rowsToInsert: Vali
         `INSERT INTO product
                (product_name, product_sku, product_price,
                 product_stock_quantity, category_id, flag_deleted, history_id, change_log_id)
-             SELECT t.id, t.name, t.sku, t.price, t.qty, t.cat, false, NULL, $6::uuid
+             SELECT t.name, t.sku, t.price, t.qty, t.cat, false, NULL, $6::uuid
                FROM unnest($1::text[], $2::text[], $3::numeric[], $4::int[], $5::uuid[])
-                    AS t(id, name, sku, price, qty, cat)`,
+                    AS t(name, sku, price, qty, cat)`,
         [
             rowsToInsert.map((r) => r.name),
             rowsToInsert.map((r) => r.sku),

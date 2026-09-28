@@ -220,6 +220,7 @@ export async function importProductsService(req: Request) {
 
     const client = await pool.connect();
 
+    console.log(...new Set(rows.map(r => r.categoryId)));
     try {
 
         await client.query('BEGIN');
@@ -231,6 +232,7 @@ export async function importProductsService(req: Request) {
             getProductsByCatgoryIdsDb(client, [...new Set(rows.map((r) => r.categoryId))])
         ]);
 
+        console.log(catRes);
         const existingSkus = new Set(skuRes.rows.map((r) => r.product_sku));
         const existingCats = new Set(catRes.rows.map((r) => r.category_id));
 
