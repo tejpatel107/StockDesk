@@ -1,6 +1,4 @@
 import { pool } from "../../../db/db.js";
-import type { ORDER_STATUSES } from "../../validators/order.validation.js";
-
 
 export async function getProductsAtOrBelowStockLevelDb(threshold: number) {
     const query = `
@@ -10,8 +8,24 @@ export async function getProductsAtOrBelowStockLevelDb(threshold: number) {
     return (await pool.query(query, [threshold])).rows;
 }
 
-export async function getBestSellingProductsDb(limit: number) {
+export async function getSalesSummaryDb(whereClause: string, values: string[]) {
+
     const query = `
+        SELECT
+            COUNT(*)                                AS total_orders,
+            SUM(o.order_total_amount)               AS total_revenue,
+            ROUND(AVG(o.order_total_amount),2)      AS average_order_value
+        FROM "order" o
+        WHERE ${whereClause}
+            AND (o.order_status = 'SHIPPED' OR o.order_status = 'DELIVERED')
+            AND (o.history_id IS NULL AND o.flag_deleted = false);
+    `;
+
+    return await pool.query(query, values);
+}
+
+export async function getBestSellingProductsDb(limit: number) {
+    let query = `
         SELECT * FROM "product"
         WHERE (product_stock_quantity <= $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;

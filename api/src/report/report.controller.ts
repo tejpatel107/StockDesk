@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { getLowStockService, getTopProductsService } from "./report.service.js";
+import { getLowStockService, getSalesSummaryService, getTopProductsService } from "./report.service.js";
 
 export async function getLowStockController(req: Request, res: Response) {
     const result = await getLowStockService(req);
@@ -11,8 +11,8 @@ export async function getTopProductsController(req: Request, res: Response) {
     return res.status(result?.statusCode as number).json(result?.data);
 };
 
-async function getSalesSummaryController(req: Request, res: Response) {
-    const result = await getSalesSummaryService();
+export async function getSalesSummaryController(req: Request, res: Response) {
+    const result = await getSalesSummaryService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 };
 
