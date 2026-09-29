@@ -6,37 +6,7 @@ viewController.get("/", (req, res) => {
   res.render("login");
 });
 
-viewController.get("/reports", async (req, res) => {
-  try {
-    const headers = {
-      Cookie: `session=${req.cookies.session}`,
-    };
 
-    const [lowStockRes, topProductsRes, salesReportRes] = await Promise.all([
-      fetch("http://localhost:3000/api/reports/low-stock?threshold=10", {
-        headers,
-      }),
-      fetch("http://localhost:3000/api/reports/top-products", {
-        headers,
-      }),
-      fetch("http://localhost:3000/api/reports/sales-report", {
-        headers,
-      }),
-    ]);
-
-    const lowStock = await lowStockRes.json();
-    const topProducts = await topProductsRes.json();
-    const salesReport = await salesReportRes.json();
-
-    res.render("reports", {
-      lowStock: lowStock.data || [],
-      topProducts: topProducts.data || [],
-      salesReport: salesReport.data || [],
-    });
-  } catch (error) {
-    res.status(500).send(error.message);
-  }
-});
 
 viewController.get("/products", async (req, res) => {
   try {

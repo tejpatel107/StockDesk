@@ -5,7 +5,7 @@ export class AppError extends Error {
 
   public success : boolean = false;
 
-  constructor(message: string, public statusCode = 500) {
+  constructor(message: string, public statusCode : number = 500) {
     super(message);
     this.name = this.constructor.name;
   }

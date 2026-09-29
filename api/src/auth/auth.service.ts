@@ -1,4 +1,4 @@
-import type { Request } from "express";
+import type { Request, Response } from "express";
 import { addNewUserDb, getUserByEmailDb } from "./auth.db.js";
 import { hashPassword, verifyPassword } from "../../utilities/hash.js";
 import { generateJwtToken } from "../../utilities/token.js";
@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { addNewCustomerDb } from "../customer/customer.db.js";
 
 
-export async function loginService(req: Request) {
+export async function loginService(req: Request, res: Response) {
 
     const { email, password } = req.body;
     const user = await getUserByEmailDb(email);
@@ -33,6 +33,13 @@ export async function loginService(req: Request) {
     }
 
     const token = await generateJwtToken({ userId: user.id, role: user.role });
+
+    res.cookie("session", token, {
+      httpOnly: true,
+      secure: process.env.ENV == "production" ? true : false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     return {
         statusCode: 200,
