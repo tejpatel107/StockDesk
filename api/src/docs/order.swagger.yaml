@@ -1,0 +1,337 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk - Orders API
+  version: 1.0.0
+  description: Endpoints for listing, viewing, creating and updating orders.
+servers:
+  - url: http://localhost:8000/api
+    description: Local development
+tags:
+  - name: Orders
+    description: Order management
+security:
+  - bearerAuth: []
+paths:
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders
+      description: |
+        Returns a paginated list of orders with customer name and item count.
+        **Roles:** ADMIN, STAFF
+      operationId: getOrders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - name: startDate
+          in: query
+          description: Include orders on or after this date (YYYY-MM-DD). Must be <= endDate.
+          schema:
+            type: string
+            format: date
+            example: "2026-09-01"
+        - name: endDate
+          in: query
+          description: Include orders on or before this date (YYYY-MM-DD).
+          schema:
+            type: string
+            format: date
+            example: "2026-09-30"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        "200":
+          description: Orders retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListResponse"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Orders]
+      summary: Create an order
+      description: |
+        Creates a PENDING order, snapshots unit prices, and reduces product stock
+        (writing history rows for the affected products).
+        **Roles:** ADMIN, STAFF, CUSTOMER
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "204":
+          description: Order created (no response body)
+        "400":
+          description: Validation error, unknown product(s), or insufficient stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                insufficientStock:
+                  value:
+                    message: "Not enough stock for products: 3f2b8c1e-5d4a-4b7e-9a10-2c6d8e4f1a77"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get an order by id
+      description: |
+        Returns an order with its items, scoped to the authenticated user's customer record.
+        **Roles:** ADMIN, STAFF, CUSTOMER
+      operationId: getOrderById
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Order retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No order found for the given id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags: [Orders]
+      summary: Update order status
+      description: |
+        Moves an order to a new status. Allowed transitions:
+        PENDING -> CONFIRMED | CANCELLED; CONFIRMED -> SHIPPED | CANCELLED; SHIPPED -> DELIVERED.
+        CANCELLED and DELIVERED orders cannot change. Cancelling restocks the products.
+        **Roles:** ADMIN, STAFF
+      operationId: updateOrderStatus
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatedOrder"
+        "400":
+          description: Validation error, order not found, or invalid status transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          description: Unexpected error while updating
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: Order id
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Role not permitted for this endpoint
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED]
+    OrderListItem:
+      type: object
+      properties:
+        customer_name:
+          type: string
+          nullable: true
+          example: Asha Patel
+        order_date:
+          type: string
+          format: date
+          example: "2026-09-25"
+        order_status:
+          $ref: "#/components/schemas/OrderStatus"
+        order_total_amount:
+          type: string
+          description: Numeric returned as string by Postgres
+          example: "1499.00"
+        order_item_count:
+          type: integer
+          example: 3
+        total_number_of_orders:
+          type: integer
+          description: Total rows matching the filters (for pagination)
+          example: 42
+    OrderListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          description: Number of orders in this page
+          example: 20
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderListItem"
+    OrderDetailItem:
+      type: object
+      properties:
+        order item id:
+          type: string
+          format: uuid
+        product id:
+          type: string
+          format: uuid
+        product name:
+          type: string
+    OrderDetail:
+      type: object
+      properties:
+        order id:
+          type: string
+          format: uuid
+        customer name:
+          type: string
+        order status:
+          $ref: "#/components/schemas/OrderStatus"
+        order date:
+          type: string
+          format: date
+        order total amount:
+          type: string
+          example: "1499.00"
+        order items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderDetailItem"
+    CreateOrderItem:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+    CreateOrderRequest:
+      type: object
+      required: [customerId, items]
+      properties:
+        customerId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreateOrderItem"
+    UpdateOrderRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+    UpdatedOrder:
+      type: object
+      properties:
+        orderId:
+          type: string
+          format: uuid
+        orderStatus:
+          $ref: "#/components/schemas/OrderStatus"
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Validation failed
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              location:
+                type: string
+                example: params
+              field:
+                type: string
+                example: status
+              message:
+                type: string

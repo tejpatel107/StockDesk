@@ -16,6 +16,7 @@
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
     "csv-parse": "^7.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -23,10 +24,13 @@
     "morgan": "^1.12.1",
     "multer": "^2.4.0",
     "pg": "^8.23.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
     "@types/csv-parse": "^1.1.12",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -34,6 +38,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^26.5.1",
     "@types/pg": "^8.23.0",
+    "@types/swagger-ui-express": "^4.1.8",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }

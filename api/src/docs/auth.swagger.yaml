@@ -1,0 +1,203 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk API
+  version: 1.0.0
+  description: Authentication endpoints for Stock Desk.
+servers:
+  - url: http://localhost:3000/api
+tags:
+  - name: Auth
+    description: Login and registration
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSuccess"
+        "400":
+          description: Validation failed (invalid email, password not meeting the policy, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Unknown email or wrong password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unknownUser:
+                  value:
+                    success: false
+                    error: User for the email a@b.com does not exists, enter correct email you used for signup
+                wrongPassword:
+                  value:
+                    success: false
+                    error: Password is wrong, please enter correct password
+
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Register a new user (or customer)
+      description: >
+        If `role` is `CUSTOMER`, a customer record is created along with the user
+        (phone number and address are stored on the customer). Any other role creates
+        a plain user record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupSuccess"
+        "400":
+          description: Validation failed (invalid email, weak password, non-E.164 phone number, unknown role, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error: User with email a@b.com already exists!
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Use the `jwt` value returned by /auth/login on protected routes.
+
+  schemas:
+    Password:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 20
+      description: >
+        Must contain at least one uppercase letter, one lowercase letter,
+        one number and one special character.
+      example: S3cretPass!
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        password:
+          $ref: "#/components/schemas/Password"
+
+    LoginSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: logged in successfully!
+        jwt:
+          type: string
+          description: JWT containing userId and role
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    Address:
+      type: object
+      required: [street, city, state, postalCode, country]
+      properties:
+        unitNumber:
+          type: number
+        streetNumber:
+          type: number
+        street:
+          type: string
+          example: MG Road
+        city:
+          type: string
+          example: Ahmedabad
+        state:
+          type: string
+          example: Gujarat
+        postalCode:
+          type: string
+          example: "380001"
+        country:
+          type: string
+          example: India
+
+    SignupRequest:
+      type: object
+      required: [email, firstName, lastName, phoneNumber, role, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        firstName:
+          type: string
+          example: Jane
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          description: Phone number in E.164 format
+          pattern: '^\+[1-9]\d{1,14}$'
+          example: "+919876543210"
+        address:
+          $ref: "#/components/schemas/Address"
+        role:
+          type: string
+          enum: [ADMIN, STAFF, CUSTOMER]
+          description: Case-insensitive; the value is upper-cased before validation.
+          example: CUSTOMER
+        password:
+          $ref: "#/components/schemas/Password"
+
+    SignupSuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: user registered successfully!
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string

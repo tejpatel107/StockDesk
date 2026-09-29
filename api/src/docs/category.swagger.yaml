@@ -1,0 +1,181 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk - Category API
+  version: 1.0.0
+  description: Product category management. All routes require a Bearer JWT.
+tags:
+  - name: Categories
+    description: Product category management
+
+paths:
+  /api/categories:
+    get:
+      summary: List categories, or search by name
+      description: >
+        Returns all active (non-deleted, non-history) categories.
+        If `search` is provided, does a partial, case-insensitive name match instead.
+        Roles: ADMIN, STAFF.
+      tags: [Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          required: false
+          schema: { type: string }
+          description: Partial category name
+      responses:
+        '200':
+          description: Categories found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  categories:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Create a category
+      description: 'Roles: ADMIN.'
+      tags: [Categories]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryCreate' }
+            example:
+              name: Beverages
+              description: Soft drinks, juices and water
+      responses:
+        '201':
+          description: Category created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  category: { $ref: '#/components/schemas/CategoryCreated' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Category with this name already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/categories/{id}:
+    patch:
+      summary: Update a category's name and/or description
+      description: >
+        At least one field is required. The previous version is stored as a history row.
+        Roles: ADMIN.
+      tags: [Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryUpdate' }
+            example:
+              description: Updated description
+      responses:
+        '200':
+          description: Updated category
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500':
+          description: Category does not exist / server error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      summary: Soft-delete a category
+      description: 'Roles: ADMIN.'
+      tags: [Categories]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CategoryId'
+      responses:
+        '204':
+          description: Category deleted
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Category not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CategoryId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Unauthorized:
+      description: Missing or invalid token
+    Forbidden:
+      description: Role not allowed to access this route
+    ValidationError:
+      description: Request failed validation
+  schemas:
+    Category:
+      type: object
+      properties:
+        category_id: { type: string, format: uuid }
+        category_name: { type: string, maxLength: 100 }
+        category_description: { type: string }
+        flag_deleted: { type: boolean }
+        history_id: { type: string, format: uuid, nullable: true }
+        change_log_id: { type: string, format: uuid }
+    CategoryCreated:
+      type: object
+      properties:
+        categoryId: { type: string, format: uuid }
+        categoryName: { type: string }
+        cetgoryDescription: { type: string }
+    CategoryCreate:
+      type: object
+      required: [name]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, default: '' }
+    CategoryUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000 }
+    Error:
+      type: object
+      properties:
+        error: { type: string }

@@ -1,0 +1,255 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk - Customer API
+  version: 1.0.0
+  description: Customer endpoints for Stock Desk.
+servers:
+  - url: http://localhost:8000/api
+    description: Local development
+tags:
+  - name: Customers
+    description: Customer management
+
+paths:
+  /customers:
+    get:
+      tags: [Customers]
+      summary: Get customers
+      description: |
+        Returns all customers. If `search` is provided, customers are filtered
+        by a partial, case-insensitive match on phone number, email or name.
+
+        **Allowed roles:** ADMIN, STAFF
+      operationId: getCustomers
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+          description: Partial match on phone number, email or name.
+          example: john
+      responses:
+        '200':
+          description: List of customers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomerListResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /customers/{id}:
+    patch:
+      tags: [Customers]
+      summary: Update customer details
+      description: |
+        Updates the logged-in customer's own details. `name` and `email` are
+        stored on the user record; `phoneNumber` and `address` on the customer
+        record. When fields from both are sent, both updates share the same
+        change log entry and run in a single transaction. Previous values are
+        kept as history rows.
+
+        **Allowed roles:** CUSTOMER (own record only)
+      operationId: updateCustomer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerRequest'
+            example:
+              name: John Doe
+              email: john.doe@example.com
+              phoneNumber: '+919876543210'
+              address: 12 MG Road, Ahmedabad
+      responses:
+        '200':
+          description: Customer updated. Returns the merged customer and user records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedCustomerResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+    delete:
+      tags: [Customers]
+      summary: Delete customer
+      description: |
+        Soft-deletes the logged-in customer's own record (sets `flag_deleted`
+        and stores a history row).
+
+        **Allowed roles:** CUSTOMER (own record only)
+      operationId: deleteCustomer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CustomerId'
+      responses:
+        '204':
+          description: Customer deleted. No content.
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CustomerId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Customer ID.
+
+  schemas:
+    Customer:
+      type: object
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+          example: John Doe
+        user_email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        customer_phone_number:
+          type: string
+          example: '+919876543210'
+        customer_address:
+          type: string
+          nullable: true
+          example: 12 MG Road, Ahmedabad
+        user_role:
+          type: string
+          description: Only returned when searching.
+          example: CUSTOMER
+
+    CustomerListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 1
+        customers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Customer'
+
+    UpdateCustomerRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        phoneNumber:
+          type: string
+          description: Phone number in E.164 format.
+          example: '+919876543210'
+        address:
+          type: string
+          example: 12 MG Road, Ahmedabad
+
+    UpdatedCustomerResponse:
+      type: object
+      description: Merged customer and user rows after the update.
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        customer_phone_number:
+          type: string
+        customer_address:
+          type: string
+          nullable: true
+        user_id:
+          type: string
+          format: uuid
+        user_name:
+          type: string
+        user_email:
+          type: string
+          format: email
+        user_role:
+          type: string
+        flag_deleted:
+          type: boolean
+        history_id:
+          type: string
+          format: uuid
+          nullable: true
+        change_log_id:
+          type: string
+          format: uuid
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Customer does not exist, Please try to update existing Customer!
+
+  responses:
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Role not allowed, or the record belongs to another customer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServerError:
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

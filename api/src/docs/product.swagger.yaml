@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk - Product API
+  version: 1.0.0
+  description: Product management endpoints (list/search, create, update, soft delete, CSV bulk import).
+servers:
+  - url: http://localhost:8000/api
+tags:
+  - name: Products
+    description: Product catalogue and stock management
+
+paths:
+  /products:
+    get:
+      tags: [Products]
+      summary: List or filter products
+      description: |
+        Returns non-deleted, current (non-history) products.
+        Filters are evaluated in this order and **only the first match is applied**:
+        `categoryId` -> `search` -> `minPrice` + `maxPrice` -> `inStock`.
+        With no filter, all products are returned.
+
+        **Roles:** ADMIN, STAFF, CUSTOMER
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+          description: Return products in this category
+        - name: search
+          in: query
+          schema: { type: string }
+          description: Case-insensitive partial match on product name or SKU
+        - name: minPrice
+          in: query
+          schema: { type: number }
+          description: Lower price bound (inclusive). Must be sent together with `maxPrice`.
+        - name: maxPrice
+          in: query
+          schema: { type: number }
+          description: Upper price bound (inclusive). Must be sent together with `minPrice`.
+        - name: inStock
+          in: query
+          schema: { type: string, enum: ["true", "false"] }
+          description: "`true` returns products with stock > 0, any other value returns products with stock = 0"
+      responses:
+        "200":
+          description: Products found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+    post:
+      tags: [Products]
+      summary: Create a product
+      description: |
+        Creates a product and records a change_log entry.
+
+        **Roles:** ADMIN
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreate"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product:
+                    $ref: "#/components/schemas/CreatedProduct"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: Product ID
+    patch:
+      tags: [Products]
+      summary: Update a product (partial)
+      description: |
+        Updates only the fields sent. At least one field is required.
+        The previous row is saved as a history record and a new change_log entry is created.
+
+        **Roles:** ADMIN
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product:
+                    type: object
+                    properties:
+                      product:
+                        $ref: "#/components/schemas/Product"
+                      changeLogId:
+                        type: string
+                        format: uuid
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+    delete:
+      tags: [Products]
+      summary: Delete a product (soft delete)
+      description: |
+        Marks the product as deleted (`flag_deleted = true`) and stores a history row.
+
+        **Roles:** ADMIN
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Product deleted (no content)
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /products/import:
+    post:
+      tags: [Products]
+      summary: Bulk import products from CSV
+      description: |
+        Uploads a CSV file of products. Invalid rows are skipped and reported; valid rows are inserted
+        in a single transaction.
+
+        **CSV rules**
+        - Required headers (case-insensitive): `name`, `sku`, `price`, `quantity`, `category_id`
+        - Max 5000 rows
+        - `price` must be a whole number (max 10 digits), `quantity` a non-negative integer
+        - `category_id` must be a valid UUID of an existing category
+        - Duplicate SKUs (within the file or already in the database) are rejected per row
+        - `row` numbers in errors are file line numbers (header = row 1, first data row = row 2)
+
+        **Roles:** ADMIN
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file
+      responses:
+        "200":
+          description: Import processed (may include row-level failures)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          description: Missing required columns, too many rows, or malformed CSV
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Product:
+      type: object
+      properties:
+        product_id: { type: string, format: uuid }
+        product_name: { type: string, maxLength: 100 }
+        product_sku: { type: string, maxLength: 100 }
+        product_price: { type: number, description: "numeric(10,0) - whole numbers" }
+        product_stock_quantity: { type: integer }
+        category_id: { type: string, format: uuid }
+        flag_deleted: { type: boolean }
+        history_id: { type: string, format: uuid, nullable: true }
+        change_log_id: { type: string, format: uuid }
+
+    CreatedProduct:
+      type: object
+      properties:
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        productSku: { type: string }
+        productPrice: { type: number }
+        productQuantity: { type: integer }
+
+    ProductListResponse:
+      type: object
+      properties:
+        count: { type: integer, example: 2 }
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+
+    ProductCreate:
+      type: object
+      required: [name, sku, price, quantity, categoryId]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100, example: Wireless Mouse }
+        sku: { type: string, minLength: 1, maxLength: 100, example: WM-1001 }
+        price: { type: number, minimum: 0, example: 1499 }
+        quantity: { type: integer, minimum: 0, maximum: 2147483647, example: 50 }
+        categoryId: { type: string, format: uuid }
+
+    ProductUpdate:
+      type: object
+      minProperties: 1
+      description: Any subset of the create fields; at least one is required.
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        sku: { type: string, minLength: 1, maxLength: 100 }
+        price: { type: number, minimum: 0 }
+        quantity: { type: integer, minimum: 0, maximum: 2147483647 }
+        categoryId: { type: string, format: uuid }
+
+    ImportResult:
+      type: object
+      properties:
+        imported: { type: integer, example: 998 }
+        failed: { type: integer, example: 2 }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              row: { type: integer, example: 14 }
+              reason: { type: string, example: duplicate SKU }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Role not permitted for this endpoint
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"

@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+<head>
+    <title>Node Authentication</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.min.css">
+    <style>
+        body { padding-top:80px; }
+    </style>
+</head>
+
+<body>
+<div class="container">
+<div class="col-sm-6 col-sm-offset-3">
+
+    <h1> Login</h1>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label>Email</label>
+            <input 
+                type="email" 
+                class="form-control" 
+                id="email"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label>Password</label>
+            <input 
+                type="password" 
+                class="form-control" 
+                id="password"
+                required
+            >
+        </div>
+
+        <button type="submit" class="btn btn-warning btn-lg">
+            Login
+        </button>
+    </form>
+
+    <p id="message"></p>
+
+</div>
+</div>
+
+<script>
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    try {
+        const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            credentials: "include",
+            body: JSON.stringify({
+                email,
+                password
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Login failed");
+        }
+
+        document.getElementById("message").innerHTML =
+            "Login successful";
+
+        // redirect after login
+        window.location.href = "/reports";
+
+    } catch (error) {
+        document.getElementById("message").innerHTML =
+            error.message;
+    }
+});
+</script>
+
+</body>
+</html>

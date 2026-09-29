@@ -1,0 +1,286 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk - Supplier API
+  description: Endpoints for managing suppliers. Updates and deletes are soft (a history row is written and a change_log record is created).
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api
+    description: Local development server
+
+tags:
+  - name: Suppliers
+    description: Supplier management
+
+security:
+  - bearerAuth: []
+
+paths:
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: Get all suppliers or search suppliers by name
+      description: |
+        Returns all active suppliers. If the `search` query parameter is provided and non-empty,
+        returns suppliers whose name matches (case-insensitive, partial match).
+
+        **Roles:** ADMIN, STAFF
+      operationId: getSuppliers
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Partial, case-insensitive supplier name to search for
+          schema:
+            type: string
+            example: acme
+      responses:
+        "200":
+          description: List of suppliers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      tags: [Suppliers]
+      summary: Add a new supplier
+      description: |
+        Creates a new supplier and records the change in the change log.
+
+        **Roles:** ADMIN
+      operationId: addNewSupplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddSupplierRequest"
+      responses:
+        "201":
+          description: Supplier created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supplier:
+                    $ref: "#/components/schemas/SupplierCreated"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /suppliers/{id}:
+    patch:
+      tags: [Suppliers]
+      summary: Update a supplier
+      description: |
+        Partially updates a supplier. At least one field must be provided.
+        A history row containing the previous values is stored.
+
+        **Roles:** ADMIN
+      operationId: updateSupplier
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSupplierRequest"
+      responses:
+        "200":
+          description: Supplier updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      tags: [Suppliers]
+      summary: Delete a supplier (soft delete)
+      description: |
+        Marks the supplier as deleted (`flag_deleted = true`) and stores a history row.
+
+        **Roles:** ADMIN
+      operationId: deleteSupplier
+      parameters:
+        - $ref: "#/components/parameters/SupplierId"
+      responses:
+        "204":
+          description: Supplier deleted (no content)
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    SupplierId:
+      name: id
+      in: path
+      required: true
+      description: Supplier UUID
+      schema:
+        type: string
+        format: uuid
+        example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+
+  schemas:
+    Supplier:
+      type: object
+      properties:
+        supplier_id:
+          type: string
+          format: uuid
+        supplier_name:
+          type: string
+          maxLength: 100
+          example: Acme Traders
+        supplier_email:
+          type: string
+          format: email
+          maxLength: 100
+          example: sales@acme.com
+        supplier_phone_number:
+          type: string
+          maxLength: 25
+          example: "+919876543210"
+        flag_deleted:
+          type: boolean
+          example: false
+        history_id:
+          type: string
+          format: uuid
+          nullable: true
+        change_log_id:
+          type: string
+          format: uuid
+
+    SupplierCreated:
+      type: object
+      properties:
+        supplierId:
+          type: string
+          format: uuid
+        supplierName:
+          type: string
+          example: Acme Traders
+        supplierEmail:
+          type: string
+          format: email
+          example: sales@acme.com
+        supplierPhoneNumber:
+          type: string
+          example: "+919876543210"
+
+    SupplierListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 1
+        Suppliers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Supplier"
+
+    AddSupplierRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, phoneNumber]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Acme Traders
+        email:
+          type: string
+          format: email
+          example: sales@acme.com
+        phoneNumber:
+          type: string
+          description: Phone number in E.164 format
+          example: "+919876543210"
+
+    UpdateSupplierRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: Acme Traders Pvt Ltd
+        email:
+          type: string
+          format: email
+          example: contact@acme.com
+        phoneNumber:
+          type: string
+          description: Phone number in E.164 format
+          example: "+919876543211"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Something went wrong
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Authenticated user's role is not allowed to access this endpoint
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Unexpected server error (also returned for "Supplier not found" / "already exists" cases)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

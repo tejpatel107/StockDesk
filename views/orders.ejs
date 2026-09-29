@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>StockDesk — Orders</title>
+  <style>
+  .card {
+    padding: 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th {
+    background: #eee;
+    padding: 8px;
+    border: 1px solid #ccc;
+    text-align: left;
+  }
+
+  td {
+    padding: 8px;
+    border: 1px solid #ccc;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 10px;
+  }
+</style>
+</head>
+<body>
+
+
+  <main>
+    <h1>Orders</h1>
+
+    <div class="toolbar card">
+      <select id="statusFilter">
+        <option value="">All statuses</option>
+        <option value="PENDING">Pending</option>
+        <option value="CONFIRMED">Confirmed</option>
+        <option value="SHIPPED">Shipped</option>
+        <option value="DELIVERED">Delivered</option>
+        <option value="CANCELLED">Cancelled</option>
+      </select>
+    </div>
+
+    <div class="card" style="padding:0">
+      <table>
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Items</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="ordersBody">
+          <% orders.forEach(order => { %>
+            <tr onclick="handleOrderItem('<%= order.order_id %>')">
+              <td><%= order.order_id %></td>
+              <td><%= order.customer_name %></td>
+              <td><%= order.total_items %></td>
+              <td><%= order.order_total_amount %></td>
+              <td><%= order.order_status %></td>
+              <td><%= order.order_date %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+  
+    <script>
+      function handleOrderItem(id){
+        console.log(id)
+         window.location.href = `/orders/${id}`;
+      }
+
+      const statusFilter = document.getElementById("statusFilter");
+      const ordersBody = document.getElementById("ordersBody");
+
+      statusFilter.addEventListener("change", function () {
+        const selectedStatus = this.value.toUpperCase();
+
+        const rows = ordersBody.querySelectorAll("tr");
+
+        rows.forEach((row) => {
+          // Status is the 5th column (index 4)
+          const status = row.cells[4].textContent.trim().toUpperCase();
+
+          if (selectedStatus === "" || status === selectedStatus) {
+            row.style.display = "";
+          } else {
+            row.style.display = "none";
+          }
+        });
+      });
+
+    </script>
+  </main>
+
+</body>
+</html>

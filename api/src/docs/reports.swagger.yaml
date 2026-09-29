@@ -1,0 +1,200 @@
+openapi: 3.0.3
+info:
+  title: Stock Desk - Reports API
+  version: 1.0.0
+  description: Inventory and sales reports (ADMIN only)
+
+tags:
+  - name: Reports
+    description: Inventory and sales reports
+
+paths:
+  /api/reports/low-stock:
+    get:
+      summary: Get products at or below a stock threshold
+      description: >
+        Returns all active (not deleted, not history) products whose stock
+        quantity is less than or equal to the given threshold.
+        Requires the ADMIN role.
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: threshold
+          required: true
+          schema:
+            type: number
+            minimum: 0
+            example: 10
+          description: Maximum stock quantity (inclusive). Cannot be negative.
+      responses:
+        "200":
+          description: Low stock products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LowStockResponse"
+        "400":
+          description: Validation error (missing, non-numeric or negative threshold)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - ADMIN role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/reports/top-products:
+    get:
+      summary: Get top selling products by quantity sold
+      description: >
+        Returns the best selling products ranked by total quantity sold,
+        counting only active orders with status DELIVERED or SHIPPED.
+        Ties are broken alphabetically by product name.
+        Requires the ADMIN role.
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: number
+            minimum: 0
+            example: 5
+          description: Maximum number of products to return. Cannot be negative.
+      responses:
+        "200":
+          description: Top selling products
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopProductsResponse"
+        "400":
+          description: Validation error (missing, non-numeric or negative limit)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - ADMIN role required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LowStockProduct:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          maxLength: 100
+          example: Wireless Mouse
+        product_sku:
+          type: string
+          maxLength: 100
+          example: WM-001
+        product_price:
+          type: string
+          description: numeric column, returned as a string by node-postgres
+          example: "25"
+        product_stock_quantity:
+          type: integer
+          example: 3
+        category_id:
+          type: string
+          format: uuid
+        flag_deleted:
+          type: boolean
+          example: false
+        history_id:
+          type: string
+          format: uuid
+          nullable: true
+          example: null
+        change_log_id:
+          type: string
+          format: uuid
+
+    LowStockResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 1
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/LowStockProduct"
+
+    TopProduct:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          example: Wireless Mouse
+        total_quantity_sold:
+          type: string
+          description: SUM() result, returned as a string by node-postgres
+          example: "120"
+
+    TopProductsResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 5
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopProduct"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Something went wrong
