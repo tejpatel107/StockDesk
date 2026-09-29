@@ -104,7 +104,7 @@ export async function getOrderByIdForCustomerService(req: Request) {
             data: res
         }
     } catch (error) {
-        throw new AppError((error as AppError).message, 500)
+        throw new AppError((error as AppError).message)
     }
 
 }
@@ -154,7 +154,7 @@ export async function createNewOrderService(req: Request) {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        throw new AppError((error as Error).message, 500);
+        throw new AppError((error as Error).message);
     } finally {
         await client.release();
     }

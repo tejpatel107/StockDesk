@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { roles } from "../../db/roles.js";
-import { personNameValidationSchema } from "./common.validation.js";
+import { ROLES } from "../../db/roles.js";
+import { paramIdValidationSchema, personNameValidationSchema } from "./common.validation.js";
 
 const passwordValidation = z.string()
     .min(8, { message: "Password must be at least 8 characters long" })
@@ -30,7 +30,7 @@ const addressValidation = z.object({
 
 const roleSchema = z.preprocess(
     (value) => (typeof value === "string" ? value.toUpperCase() : value),
-    z.enum(roles)
+    z.enum(ROLES)
 );
 
 export const signUpValidation = z.object({
@@ -56,4 +56,12 @@ export const updateCustomerDetailsValidationSchema = z.object({
     email: z.email().optional(),
     phoneNumer: z.e164().optional(),
     address: addressValidation.optional()
+});
+
+export const customerIdValidationSchema = paramIdValidationSchema("id");
+
+export const customerQueryParamsValidationSchema = z.object({
+    name: z.string().optional(),
+    email: z.email().optional(),
+    phoneNumber: z.e164().optional()
 });

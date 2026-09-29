@@ -2,7 +2,7 @@ import type { Request } from "express";
 import { addNewUserDb, getUserByEmailDb } from "./auth.db.js";
 import { hashPassword, verifyPassword } from "../../utilities/hash.js";
 import { generateJwtToken } from "../../utilities/token.js";
-import { roles } from "../../../db/roles.js";
+import { ROLES } from "../../../db/roles.js";
 import { randomUUID } from "node:crypto";
 import { addNewCustomerDb } from "../customer/customer.db.js";
 
@@ -64,8 +64,8 @@ export async function registerService(req: Request) {
     const hashedPassword = await hashPassword(password);
     const userId = randomUUID();
 
-    if (role === roles.CUSTOMER) {
-        user = await addNewCustomerDb(randomUUID(), userId, (firstName as string).concat(" ",lastName as string), email, phoneNumber, address, hashedPassword, roles.CUSTOMER);
+    if (role === ROLES.CUSTOMER) {
+        user = await addNewCustomerDb(randomUUID(), userId, (firstName as string).concat(" ",lastName as string), email, phoneNumber, address, hashedPassword, ROLES.CUSTOMER);
     }
     else {
         user = await addNewUserDb(userId, firstName + " " + lastName, email, hashedPassword, role);

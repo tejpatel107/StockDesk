@@ -1,7 +1,7 @@
 import express, { type Router, type Express, type Request, type Response, type NextFunction } from "express";
 import appRouter from "./app.routes.js";
 import { ValidationError } from "./middlewares/validate.middleware.js";
-import { AppError, ConflictError, NotFoundError } from "./utilities/globalErrorHandlers.js";
+import { AppError, AuthError, ConflictError, NotFoundError } from "./utilities/globalErrorHandlers.js";
 import morgan from "morgan";
 
 const PORT: number = 8000;
@@ -25,16 +25,12 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
         return res.status(400).json({ message: err.message, errors: err.errors });
     }
 
-    if (err instanceof NotFoundError) {
-        return res.status(404).json({ message: err.message });
-    }
-
-    if (err instanceof ConflictError) {
-        return res.status(409).json({ message: err.message });
+    if (err instanceof NotFoundError || ConflictError || AuthError) {
+        return res.status(err.statusCode).json({ success: err.success, message: err.message });
     }
 
     if (err instanceof AppError) {
-        return res.status(500).json({ message: err.message });
+        return res.status(500).json({ success: err.success, message: err.message });
     }
 
     res.status(500).json({ message: "Internal server error" });

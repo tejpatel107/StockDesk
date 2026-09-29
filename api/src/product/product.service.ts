@@ -232,7 +232,6 @@ export async function importProductsService(req: Request) {
             getProductsByCatgoryIdsDb(client, [...new Set(rows.map((r) => r.categoryId))])
         ]);
 
-        console.log(catRes);
         const existingSkus = new Set(skuRes.rows.map((r) => r.product_sku));
         const existingCats = new Set(catRes.rows.map((r) => r.category_id));
 
@@ -256,7 +255,9 @@ export async function importProductsService(req: Request) {
         return {
             statusCode: 200,
             data: {
-                "failed imports": errors
+                "imported" : rowsInserted,
+                "failed": errors.length,
+                "errors": errors
             }
         };
 
@@ -282,7 +283,7 @@ async function parseCsvService(buffer: Buffer<ArrayBufferLike>) {
             trim: true,
         });
     } catch (error) {
-        throw new AppError(error.message, 500);
+        throw new AppError(error.message);
     }
 
     const missing = REQUIRED_COLUMNS.filter((c) => !headers.includes(c));

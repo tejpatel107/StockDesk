@@ -157,7 +157,7 @@ export async function deleteCustomerService(req: Request) {
 
     const userId: string = req.user?.userId;
     const { id } = req.params;
-
+    console.log(req.customerId);
     try {
 
         let customer = await getCustomerByIdDb(id as string);

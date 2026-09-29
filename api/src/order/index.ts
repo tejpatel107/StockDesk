@@ -1,13 +1,15 @@
 import express, { type Router } from "express";
-import { createNewOrderController, getOrderByIdController, getOrdersController, updateOrderController } from "./order.controller.js";
+import { createNewOrderController, getOrderByIdForCustomerController, getOrdersController, updateOrderController } from "./order.controller.js";
 import { validate } from "../../middlewares/validate.middleware.js";
 import { addNewOrderValidationSchema, orderParamIdValidationSchema, updateOrderValidationSchema } from "../../validators/order.validation.js";
+import { ROLES } from "../../../db/roles.js";
+import { attachCustomer, authorizeUser } from "../../middlewares/auth.middleware.js";
 
 const orderRouter : Router = express.Router();
 
-orderRouter.get("/", getOrdersController);
-orderRouter.get("/:id", validate({ params: orderParamIdValidationSchema }) , getOrderByIdController);
-orderRouter.post("/", validate({body : addNewOrderValidationSchema }) ,createNewOrderController);
-orderRouter.patch("/:id", validate({params: orderParamIdValidationSchema, body : updateOrderValidationSchema }), updateOrderController);
+orderRouter.get("/", authorizeUser(ROLES.ADMIN, ROLES.STAFF), getOrdersController);
+orderRouter.get("/:id", authorizeUser(ROLES.ADMIN, ROLES.STAFF, ROLES.CUSTOMER), validate({ params: orderParamIdValidationSchema }), getOrderByIdForCustomerController);
+orderRouter.post("/", authorizeUser(ROLES.ADMIN, ROLES.STAFF, ROLES.CUSTOMER), validate({body : addNewOrderValidationSchema }) ,createNewOrderController);
+orderRouter.patch("/:id", authorizeUser(ROLES.ADMIN, ROLES.STAFF), validate({params: orderParamIdValidationSchema, body : updateOrderValidationSchema }), updateOrderController);
 
 export default orderRouter;

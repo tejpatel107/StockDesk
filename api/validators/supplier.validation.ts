@@ -2,10 +2,10 @@ import z from "zod";
 import { atLeastOneField, AT_LEAST_ONE_FIELD, paramIdValidationSchema } from "./common.validation.js";
 
 
-export const supplierIdParam = paramIdValidationSchema("id");
+export const supplierIdParamValidationSchema = paramIdValidationSchema("id");
  
 // supplier_name varchar(100), supplier_email varchar(100), supplier_phone_number varchar(25) - all NOT NULL
-export const supplierCreateBody = z
+export const addSupplierValidationSchema = z
   .object({
     name: z.string().trim().min(1, "Name is required").max(100),
     email: z.email(),
@@ -13,6 +13,6 @@ export const supplierCreateBody = z
   })
   .strict();
  
-export const supplierUpdateBody = supplierCreateBody
+export const updateSupplierValidationSchema = addSupplierValidationSchema
   .partial()
   .refine(atLeastOneField, AT_LEAST_ONE_FIELD);

@@ -7,7 +7,7 @@ export async function getOrdersController(req: Request, res: Response) {
     return res.status(result?.statusCode as number).json(result?.data);
 }
 
-export async function getOrderByIdController(req: Request, res: Response) {
+export async function getOrderByIdForCustomerController(req: Request, res: Response) {
     const result = await getOrderByIdForCustomerService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }

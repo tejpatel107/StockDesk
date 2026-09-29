@@ -1,7 +1,7 @@
 import { randomUUID, type UUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
-import type { roles } from "../../../db/roles.js";
+import type { ROLES } from "../../../db/roles.js";
 
 export async function getAllCustomersDb() {
     let query = `
@@ -49,7 +49,7 @@ export async function getCustomerByPhoneNumberOrEmailOrNameDb(value: string) {
     return (await pool.query(query, [`%${value}%`])).rows;
 }
 
-export async function addNewCustomerDb(customerId: string, userId: string, name: string, email: string, phoneNumber: string, address: string, password: string, role: roles) {
+export async function addNewCustomerDb(customerId: string, userId: string, name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES) {
 
     const client = await pool.connect();
     try {

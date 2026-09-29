@@ -1,21 +1,21 @@
 import type { UUID } from "node:crypto";
-import type { roles } from "../../db/roles.js";
+import { ROLES } from "../../db/roles.js";
 import type { NextFunction, Request, Response } from "express";
 import "dotenv/config";
-import { loginValidation, signUpValidation } from "../validators/user.validation.js";
 import { verifyJwt } from "../utilities/token.js";
-import { error } from "node:console";
-import { ValidationError } from "./validate.middleware.js";
+import { AuthError } from "../utilities/globalErrorHandlers.js";
+import { pool } from "../../db/db.js";
 
-const jwtSecret =  process.env.JWT_SECRET_KEY || " ";
+const jwtSecret = process.env.JWT_SECRET_KEY || " ";
 
 interface JwtPayload {
     userId: UUID,
-    role: roles
+    role: ROLES
 }
 
 interface AuthenticatedRequest extends Request {
-    user?: JwtPayload
+    user?: JwtPayload,
+    customerId?: string
 }
 
 export async function authenticateJwtToken(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -51,32 +51,50 @@ export async function authenticateJwtToken(req: AuthenticatedRequest, res: Respo
 
 }
 
-// export function validateSingUpRequest(req: Request, res: Response, next: NextFunction) {
+export function authorizeUser(...roles: ROLES[]) {
 
-//     const result = signUpValidation.safeParse(req.body);
+    return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
 
-//     if (result.error) {
-//         const [issue] = result.error.issues
-//         next(new ValidationError([{
-//             location : issue?.path,
+        if (!req.user) {
+            return next(new AuthError("Unauthenticated, please login first!", 401));
+        }
 
-//         }]))
-//     }
+        if (!roles.includes(req.user.role)) {
+            return next(new AuthError("You are not authorized to access this reosurce.", 403));
+        }
 
-//     req.body = result.data;
-//     next();
-// }
-
-export function validateLoginRequest(req: Request, res: Response, next: NextFunction) {
-
-    const result = loginValidation.safeParse(req.body);
-
-    if (result.error) {
-        return res.status(400).json({
-            error : result.error
-        });
+        next();
     }
-
-    req.body = result.data;
-    next();
 }
+
+export const attachCustomer =
+    ({ required = true }: { required: boolean }) =>
+        async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            try {
+                if (req.user?.role !== ROLES.CUSTOMER) return next();
+
+                const { rows } = await pool.query(
+                    `SELECT customer_id FROM "customer"
+          WHERE user_id = $1 AND flag_deleted = false`,
+                    [req.user.userId]
+                );
+
+                if (rows[0]) {
+                    req.customerId = rows[0].customer_id;
+                } else if (required) {
+                    return next(new AuthError("No customer profile exists for this account", 404));
+                }
+                next();
+            } catch (err) {
+                next(err);
+            }
+        };
+
+export const requireOwnCustomer =
+    (param = "id") =>
+        (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+            if (req.params[param] !== req.customerId) {
+                return next(new AuthError("You are FORBIDDEN to manipulate data of other customers!", 403));
+            }
+            next();
+        };

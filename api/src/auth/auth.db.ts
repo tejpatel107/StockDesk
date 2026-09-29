@@ -1,13 +1,13 @@
 import { randomUUID, type UUID } from "node:crypto";
 import { pool } from "../../../db/db.js";
-import type { roles } from "../../../db/roles.js";
+import type { ROLES } from "../../../db/roles.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 
 interface UserRecord {
     email: string,
     password: string,
     id: UUID,
-    role: roles
+    role: ROLES
 }
 
 export async function getUserByEmailDb(email: string): Promise<UserRecord | undefined> {
@@ -33,7 +33,7 @@ export async function getUserByIdDb(userId: string) {
     return (await pool.query(query,[userId])).rows[0];
 }
 
-export async function addNewUserDb(userId: string, name: string, email: string, password: string, role: roles): Promise<UserRecord | undefined> {
+export async function addNewUserDb(userId: string, name: string, email: string, password: string, role: ROLES): Promise<UserRecord | undefined> {
 
     const client = await pool.connect();
     try {

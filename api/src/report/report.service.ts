@@ -18,7 +18,7 @@ export async function getLowStockService(req: Request) {
             }
         };
     } catch (error) {
-        throw new AppError(error.message, 500);
+        throw new AppError(error.message);
     }
 }
 
@@ -37,7 +37,7 @@ export async function getTopProductsService(req: Request) {
             }
         }
     } catch (error) {
-        throw new AppError(error.message, 500);
+        throw new AppError(error.message);
     }
 
 }
