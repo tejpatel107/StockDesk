@@ -10,7 +10,7 @@ const quantity = z.number().int("Must be a whole number").min(0, "Stock can't be
 export const productIdParamValidationSchema = paramIdValidationSchema("id");
 
 export const addProductValidationSchema = z.object({
-    name, sku, price: moneyValidationSchema, quantity, catgoeryId: z.uuid()
+    name, sku, price: moneyValidationSchema, quantity, categoryId: z.uuid()
 });
 
 export const updateProductValidationSchema = addProductValidationSchema

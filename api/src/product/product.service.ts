@@ -1,9 +1,9 @@
 import type { Request } from "express";
-import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, type ProductRecord, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb } from "./product.db.js";
+import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb } from "./product.db.js";
 import { error } from "node:console";
 import { randomUUID } from "node:crypto";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
-import { AppError } from "../../utilities/globalErrorHandlers.js";
+import { AppError, ConflictError } from "../../utilities/globalErrorHandlers.js";
 import { csvRowValidationSchema } from "../../validators/productValidation.js";
 import { pool } from "../../../db/db.js";
 import { parse } from "csv-parse/sync";
@@ -129,10 +129,12 @@ export async function addNewProductService(req: Request) {
     try {
 
         const products = await getProductsByNameOrSkuDb(sku);
-        let product: ProductRecord = products.length > 0 && products[0];
+        let product: any = products.length > 0 && products[0];
 
-        if (product.productSku === sku) {
-            throw error("Product already exists");
+        console.log(product)
+
+        if (product && product.product_sku === sku) {
+            throw new ConflictError("Product already exists");
         }
 
         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;

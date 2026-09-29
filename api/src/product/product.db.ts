@@ -3,14 +3,6 @@ import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import type { ValidRow } from "./product.service.js";
 
-export interface ProductRecord {
-    productId: UUID,
-    productName: string,
-    productSku: UUID,
-    productPrice: number,
-    productQuantity: number;
-}
-
 const allowedFields = {
     name: "product_name",
     price: "product_price",
