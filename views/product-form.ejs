@@ -5,7 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title><%= title %></title>
+    <title>
+        <%= title %>
+    </title>
 
     <style>
         body {
@@ -83,114 +85,87 @@
 
 <body>
 
-<div class="container">
+    <div class="container">
 
-    <h2><%= title %></h2>
+        <h2>
+            <%= title %>
+        </h2>
 
-    <% if (error) { %>
-        <div class="error">
-            <%= error %>
-        </div>
-    <% } %>
+        <% if (error) { %>
+            <div class="error">
+                <%= error %>
+            </div>
+            <% } %>
 
-    <form
-        method="POST"
-        action="<%= product.product_id
-            ? '/products/' + product.product_id + '/edit'
-            : '/products/add' %>"
-    >
+                <form method="POST" action="<%= product.product_sku
+            ? '/products/' + encodeURIComponent(product.product_sku) + '/edit'
+            : '/products/add' %>">
 
-        <div class="form-group">
-            <label for="name">Product Name</label>
+                    <div class="form-group">
+                        <% if (product.product_id) { %>
+                            <input type="hidden" name="product_id" value="<%= product.product_id %>">
+                            <% } %>
 
-            <input
-                id="name"
-                type="text"
-                name="name"
-                value="<%= product.product_name || '' %>"
-                required
-            >
-        </div>
+                    </div>
 
-        <div class="form-group">
-            <label for="sku">SKU</label>
+                    <div class="form-group">
+                        <label for="name">Product Name</label>
+                        <input type="hidden" name="original_name" value="<%= product.product_name %>">
+                        <input id="name" type="text" name="name" value="<%= product.product_name || '' %>" required>
+                    </div>
 
-            <input
-                id="sku"
-                type="text"
-                name="sku"
-                value="<%= product.product_sku || '' %>"
-                required
-            >
-        </div>
+                    <div class="form-group">
+                        <label for="sku">SKU</label>
+                        <input type="hidden" name="original_sku" value="<%= product.product_sku %>">
+                        <input id="sku" type="text" name="sku" value="<%= product.product_sku || '' %>" required>
+                    </div>
 
-        <div class="form-group">
-            <label for="price">Price</label>
+                    <div class="form-group">
+                        <label for="price">Price</label>
+                        <input type="hidden" name="original_price" value="<%= product.product_price %>">
+                        <input id="price" type="number" name="price" value="<%= product.product_price ?? '' %>" min="0"
+                            step="0.01" required>
+                    </div>
 
-            <input
-                id="price"
-                type="number"
-                name="price"
-                value="<%= product.product_price || '' %>"
-                min="0"
-                step="0.01"
-                required
-            >
-        </div>
+                    <div class="form-group">
+                        <label for="quantity">Quantity</label>
+                        <input type="hidden" name="original_quantity" value="<%= product.product_stock_quantity %>">
+                        <input id="quantity" type="number" name="quantity"
+                            value="<%= product.product_stock_quantity ?? '' %>" min="0" required>
+                    </div>
 
-        <div class="form-group">
-            <label for="stockQuantity">Quantity</label>
+                    <div class="form-group">
+                        <label for="categoryId">Category</label>
+                        <input type="hidden" name="original_categoryId" value="<%= product.category_id %>">
+                        <select id="categoryId" name="categoryId" required>
+                            <option value="">Select Category</option>
 
-            <input
-                id="stockQuantity"
-                type="number"
-                name="stockQuantity"
-                value="<%= product.product_stock_quantity ?? '' %>"
-                min="0"
-                required
-            >
-        </div>
+                            <% categories.forEach(category=> { %>
+                                <option value="<%= category.category_id %>" <%=String(product.category_id ?? ""
+                                    )===String(category.category_id) ? "selected" : "" %>
+                                    >
+                                    <%= category.category_name %>
+                                </option>
+                                <% }) %>
+                        </select>
+                    </div>
 
-        <div class="form-group">
-            <label for="categoryId">Category</label>
+                    <div class="actions">
 
-            <select
-                id="categoryId"
-                name="categoryId"
-                required
-            >
-                <option value="">Select Category</option>
+                        <button type="submit">
+                            <%= product.product_sku ? "Update Product" : "Add Product" %>
+                        </button>
 
-                <% categories.forEach(category => { %>
+                        <a href="/products" class="btn cancel">
+                            Cancel
+                        </a>
 
-                    <option
-                        value="<%= category.category_id %>"
-                        <%= String(product.category_id || "") === String(category.category_id)
-                            ? "selected"
-                            : "" %>
-                    >
-                        <%= category.category_name %>
-                    </option>
+                    </div>
 
-                <% }) %>
-            </select>
-        </div>
+                </form>
 
-        <div class="actions">
-
-            <button type="submit">
-                <%= product.product_id ? "Update Product" : "Add Product" %>
-            </button>
-
-            <a href="/products" class="btn cancel">
-                Cancel
-            </a>
-
-        </div>
-
-    </form>
-
-</div>
+    </div>
 
 </body>
+
 </html>

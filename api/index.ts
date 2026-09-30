@@ -22,6 +22,7 @@ app.set("views", path.join(process.cwd(), "views"));
 app.options("/{*splat}", cors(corsOptions));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
@@ -60,7 +61,7 @@ app.get("api/health", async (req: Request, res: Response) => {
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
-    console.error("GLOBAL ERROR:"); console.error(err); console.error("name:", err?.name); console.error("message:", err?.message); console.error("stack:", err?.stack);
+    // console.error("GLOBAL ERROR:"); console.error(err); console.error("name:", err?.name); console.error("message:", err?.message); console.error("stack:", err?.stack);
 
     if (err instanceof ValidationError) {
         return res.status(400).json({ message: err.message, errors: err.errors });

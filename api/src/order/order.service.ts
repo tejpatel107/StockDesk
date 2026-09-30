@@ -86,7 +86,7 @@ export async function getOrderByIdForCustomerService(req: Request) {
 
         const { order_id, customer_name, order_status, order_date, order_total_amount } = orderItems[0];
 
-        const res = {
+        const order = {
             "order id": order_id,
             "customer name": customer_name,
             "order status": order_status,
@@ -101,7 +101,7 @@ export async function getOrderByIdForCustomerService(req: Request) {
 
         return {
             statusCode: 200,
-            data: res
+            data: order
         }
     } catch (error) {
         throw new AppError((error as AppError).message)
@@ -162,14 +162,13 @@ export async function createNewOrderService(req: Request) {
 }
 
 async function getDesiredProducts(client: PoolClient, reqeuestedProductIds: string[]) {
-    const { rows : products } = await getProductsDb(client, reqeuestedProductIds);
-    
-    const foundProductIds = new Set(products.map(p=>p.product_id));
+    const { rows: products } = await getProductsDb(client, reqeuestedProductIds);
+
+    const foundProductIds = new Set(products.map(p => p.product_id));
 
     const ids = reqeuestedProductIds.filter(id => !foundProductIds.has(id));
-    
-    if (ids.length > 0)
-    {
+
+    if (ids.length > 0) {
         throw new Error(`Products does not exist for : ${Array.from(ids).join(", ")}`)
     }
 

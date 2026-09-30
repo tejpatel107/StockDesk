@@ -41,6 +41,7 @@ export async function getTopProductsService(req: Request) {
     }
 
 }
+
 export async function getSalesSummaryService(req: Request) {
 
     const { from, to } = req.query;
@@ -49,6 +50,10 @@ export async function getSalesSummaryService(req: Request) {
 
         const condition: string[] = [];
         const values: string[] = [];
+
+        if (!from && !to) {
+
+        }
 
         if (from) {
             values.push(from as string);
@@ -60,7 +65,11 @@ export async function getSalesSummaryService(req: Request) {
             condition.push(`o.order_date <= $${values.length}`);
         }
 
+        condition.push("o.order_status = 'SHIPPED' OR o.order_status = 'DELIVERED'");
+        condition.push("o.history_id IS NULL AND o.flag_deleted = false");
+        
         const whereClause = condition.join(" AND ");
+        console.log(whereClause);
 
         const { rows: [summary] } = await getSalesSummaryDb(whereClause, values);
 

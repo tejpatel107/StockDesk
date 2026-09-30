@@ -188,7 +188,37 @@
             -->
 
             <div class="sales-placeholder">
-                Sales report will be available here.
+                <% if (salesReport.length===0) { %>
+
+                    <p class="empty">No product sales found.</p>
+
+                    <% } else { %>
+
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Total orders</th>
+                                    <th>Total Revenue</th>
+                                    <th>Average Order Value</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <%= salesReport.total_orders %>
+                                    </td>
+                                    <td>
+                                        <%= salesReport.total_revenue %>
+                                    </td>
+                                    <td>
+                                        <%= salesReport.average_order_value %>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <% } %>
             </div>
 
         </section>
@@ -198,4 +228,3 @@
 </body>
 
 </html>
-

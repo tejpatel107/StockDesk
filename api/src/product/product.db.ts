@@ -46,6 +46,22 @@ export async function getProductsByNameOrSkuDb(value: string) {
     return (await pool.query(query, [`%${value}%`])).rows;
 }
 
+export async function getProductsByNameDb(value: type) {
+    let query = `
+        SELECT * FROM "product"
+        WHERE (product_name = $1) AND (history_id is NULL) AND (flag_deleted = false);
+    `;
+    return (await pool.query(query, [`%${value}%`]));
+}
+
+export async function getProductsBySkuDb(value: type) {
+    let query = `
+        SELECT * FROM "product"
+        WHERE (product_name = $1) AND (history_id is NULL) AND (flag_deleted = false);
+    `;
+    return (await pool.query(query, [`%${value}%`]));
+}
+
 export async function getProductsByCategoryIdDb(id: string) {
     let query = `
         SELECT * FROM "product"
@@ -261,7 +277,7 @@ export async function getProductsByCatgoryIdsDb(client: PoolClient, categoryIds:
 
 export async function addProductsInBulkDb(client: PoolClient, rowsToInsert: ValidRow[], userId: string) {
 
-    const { rows : [changeLog] } = await client.query(`
+    const { rows: [changeLog] } = await client.query(`
                                         INSERT INTO change_log (
                                             change_log_id,
                                             user_id,

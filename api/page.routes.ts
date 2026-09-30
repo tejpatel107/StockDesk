@@ -2,6 +2,10 @@ import { Router } from "express";
 
 const router = Router();
 
+router.get("/", (req, res) => {
+    res.render("login", { error: null });
+})
+
 router.get("/login", (req, res) => {
     res.render("login", { error: null });
 });
@@ -17,7 +21,7 @@ router.get("/reports", async (req, res) => {
 
         const headers = { Authorization: `Bearer ${token}`, };
 
-        const [lowStockRes, topProductsRes] = await Promise.all([
+        const [lowStockRes, topProductsRes, salesSummaryRes] = await Promise.all([
             fetch(
                 "http://localhost:8000/api/reports/low-stock?threshold=10",
                 {
@@ -31,9 +35,13 @@ router.get("/reports", async (req, res) => {
                     headers,
                 }
             ),
+            fetch(
+                "http://localhost:8000/api/reports/sales-summary",
+                {
+                    headers,
+                }
+            ),
         ]);
-
-        console.log(topProductsRes);
 
         // Check API responses
         if (!lowStockRes.status) {
@@ -48,15 +56,24 @@ router.get("/reports", async (req, res) => {
             );
         }
 
+        if (!salesSummaryRes.status) {
+            throw new Error(
+                `Top products API failed: ${topProductsRes.status} `
+            );
+        }
+
         const lowStock = await lowStockRes.json();
         const topProducts = await topProductsRes.json();
+        const salesSummary = await salesSummaryRes.json();
+
+        console.log(salesSummary['Sales Summary']);
 
         res.render("reports", {
             lowStock: lowStock.products || [],
             topProducts: topProducts.products || [],
 
             // Leave this available for when the API is implemented
-            salesReport: [],
+            salesReport: salesSummary['Sales Summary'] || {},
         });
 
     } catch (error: any) {
@@ -204,7 +221,7 @@ router.get("/products/add", async (req, res) => {
             "http://localhost:8000/api/categories",
             {
                 headers: {
-                    Authorization: `Bearer ${ token } `,
+                    Authorization: `Bearer ${token}`,
                 },
             }
         );
@@ -213,13 +230,15 @@ router.get("/products/add", async (req, res) => {
             return res.redirect("/login");
         }
 
-        if (!response.status) {
-            throw new Error(`Categories API failed: ${ response.status } `);
+        if (!response.ok) {
+            throw new Error(
+                `Categories API failed: ${response.status} ${response.statusText}`
+            );
         }
 
         const result = await response.json();
 
-        res.render("product-form", {
+        return res.render("product-form", {
             title: "Add Product",
             product: {},
             categories: result.categories || [],
@@ -228,7 +247,8 @@ router.get("/products/add", async (req, res) => {
 
     } catch (error: any) {
         console.error("Add product page error:", error);
-        res.status(500).send(error.message);
+
+        return res.status(500).send(error.message);
     }
 });
 
@@ -242,6 +262,16 @@ router.post("/products/add", async (req, res) => {
             return res.redirect("/login");
         }
 
+        const data = JSON.stringify({
+            name: req.body.name,
+            sku: req.body.sku,
+            price: Number(req.body.price),
+            quantity: Number(req.body.quantity),
+            categoryId: req.body.categoryId,
+        });
+
+        console.log(data);
+
         const response = await fetch(
             "http://localhost:8000/api/products",
             {
@@ -249,46 +279,38 @@ router.post("/products/add", async (req, res) => {
 
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${ token } `,
+                    Authorization: `Bearer ${token} `,
                 },
 
-                body: JSON.stringify(req.body),
+                body: data,
             }
         );
 
-        const result = await response.json();
+        if (response.status === 401) {
+            return res.redirect("/login");
+        }
 
         if (!response.ok) {
+            const result = await response.json();
 
-            // Fetch categories again so the form can be rendered
-            const categoryRes = await fetch(
+            // Re-fetch categories because we need them
+            // when rendering the form again.
+            const categoriesResponse = await fetch(
                 "http://localhost:8000/api/categories",
                 {
                     headers: {
-                        Authorization: `Bearer ${ token } `,
+                        Authorization: `Bearer ${token}`,
                     },
                 }
             );
 
-            const categoryResult = await categoryRes.json();
+            const categoriesResult = await categoriesResponse.json();
 
-            return res.render("product-form", {
+            return res.status(400).render("product-form", {
                 title: "Add Product",
-
-                product: {
-                    product_name: req.body.name,
-                    product_sku: req.body.sku,
-                    product_price: req.body.price,
-                    product_stock_quantity: req.body.stockQuantity,
-                    category_id: req.body.categoryId,
-                },
-
-                categories: categoryResult.categories || [],
-
-                error:
-                    result.error ||
-                    result.message ||
-                    "Could not add product",
+                product: req.body,
+                categories: categoriesResult.categories || [],
+                error: result.message || "Failed to create product",
             });
         }
 
@@ -302,7 +324,7 @@ router.post("/products/add", async (req, res) => {
 
 
 // Edit Product Page
-router.get("/products/:id/edit", async (req, res) => {
+router.get("/products/:sku/edit", async (req, res) => {
     try {
         const token = req.cookies.session;
 
@@ -310,145 +332,131 @@ router.get("/products/:id/edit", async (req, res) => {
             return res.redirect("/login");
         }
 
-        const headers = {
-            Authorization: `Bearer ${ token } `,
-        };
+        const { sku } = req.params;
 
-        const [productRes, categoryRes] = await Promise.all([
-            fetch(
-                `http://localhost:8000/api/products/${req.params.id}`,
-{ headers }
-            ),
+        const productRes = await fetch(
+            `http://localhost:8000/api/products?search=${encodeURIComponent(sku)}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            },
+        );
 
-fetch(
-    "http://localhost:8000/api/categories",
-    { headers }
-),
-        ]);
+        const categoryRes = await fetch(
+            `http://localhost:8000/api/categories`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            },
+        );
 
-if (productRes.status === 401 || categoryRes.status === 401) {
-    return res.redirect("/login");
-}
+        if (productRes.status === 401 || categoryRes.status === 401) {
+            return res.redirect("/login");
+        }
 
-if (!productRes.ok) {
-    throw new Error(
-        `Product API failed: ${productRes.status}`
-    );
-}
+        if (!productRes.ok) {
+            throw new Error(
+                `Product API failed: ${productRes.status} ${productRes.statusText}`
+            );
+        }
 
-if (!categoryRes.ok) {
-    throw new Error(
-        `Categories API failed: ${categoryRes.status}`
-    );
-}
+        if (!categoryRes.ok) {
+            throw new Error(
+                `Category API failed: ${categoryRes.status} ${categoryRes.statusText}`
+            );
+        }
 
-const productResult = await productRes.json();
-const categoryResult = await categoryRes.json();
+        const productsResult = await productRes.json();
+        const categoriesResult = await categoryRes.json();
 
-/*
- * Normalize the product API response
- * into the fields expected by product-form.ejs.
- */
-const apiProduct =
-    productResult.product ||
-    productResult.data;
+        const product = productsResult.products?.[0];
 
-const product = {
-    product_id:
-        apiProduct.productId ||
-        apiProduct.product_id,
+        if (!product) {
+            return res.status(404).send("Product not found");
+        }
 
-    product_name:
-        apiProduct.productName ||
-        apiProduct.product_name,
+        console.log(product);
 
-    product_sku:
-        apiProduct.productSku ||
-        apiProduct.product_sku,
-
-    product_price:
-        apiProduct.productPrice ||
-        apiProduct.product_price,
-
-    product_stock_quantity:
-        apiProduct.productQuantity ??
-        apiProduct.product_stock_quantity,
-
-    category_id:
-        apiProduct.categoryId ||
-        apiProduct.category_id,
-};
-
-res.render("product-form", {
-    title: "Edit Product",
-    product,
-    categories: categoryResult.categories || [],
-    error: "",
-});
+        return res.render("product-form", {
+            title: "Edit Product",
+            product,
+            categories: categoriesResult.categories || [],
+            error: "",
+        });
 
     } catch (error: any) {
-    console.error("Edit product page error:", error);
-    res.status(500).send(error.message);
-}
+        console.error("Edit product page error:", error);
+
+        return res.status(500).send(error.message);
+    }
 });
 
-
 // Edit Product Submit
-router.post("/products/:id/edit", async (req, res) => {
+router.post("/products/:sku/edit", async (req, res) => {
     try {
         const token = req.cookies.session;
 
         if (!token) {
             return res.redirect("/login");
+        }
+
+        const { product_id } = req.body;
+
+        const updates: Record<string, unknown> = {};
+
+        if (req.body.name !== req.body.original_name) {
+            updates.name = req.body.name;
+        }
+
+        if (req.body.sku !== req.body.original_sku) {
+            updates.sku = req.body.sku;
+        }
+
+        if (Number(req.body.price) !== Number(req.body.original_price)) {
+            updates.price = Number(req.body.price);
+        }
+
+        if (Number(req.body.quantity) !== Number(req.body.original_quantity)) {
+            updates.quantity = Number(req.body.quantity);
+        }
+
+        if (req.body.categoryId !== req.body.original_categoryId) {
+            updates.categoryId = req.body.categoryId;
+        }
+
+        console.log("Changed fields:", updates);
+
+        // Nothing changed
+        if (Object.keys(updates).length === 0) {
+            return res.redirect("/products");
         }
 
         const response = await fetch(
-            `http://localhost:8000/api/products/${req.params.id}`,
+            `http://localhost:8000/api/products/${product_id}`,
             {
                 method: "PATCH",
-
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
-
-                body: JSON.stringify(req.body),
+                body: JSON.stringify(updates),
             }
         );
 
-        const result = await response.json();
+        if (response.status === 401) {
+            return res.redirect("/login");
+        }
 
         if (!response.ok) {
+            const result = await response.json();
 
-            const categoryRes = await fetch(
-                "http://localhost:8000/api/categories",
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
-            const categoryResult = await categoryRes.json();
-
-            return res.render("product-form", {
+            return res.status(400).render("product-form", {
                 title: "Edit Product",
-
-                product: {
-                    product_id: req.params.id,
-                    product_name: req.body.name,
-                    product_sku: req.body.sku,
-                    product_price: req.body.price,
-                    product_stock_quantity: req.body.stockQuantity,
-                    category_id: req.body.categoryId,
-                },
-
-                categories: categoryResult.categories || [],
-
-                error:
-                    result.error ||
-                    result.message ||
-                    "Could not update product",
+                product: req.body,
+                categories: [],
+                error: result.message || "Failed to update product",
             });
         }
 
@@ -456,10 +464,130 @@ router.post("/products/:id/edit", async (req, res) => {
 
     } catch (error: any) {
         console.error("Edit product error:", error);
+
+        return res.status(500).send(error.message);
+    }
+});
+
+
+router.get("/orders", async (req, res) => {
+    try {
+        const token = req.cookies.session;
+
+        const {
+            page = "1",
+            pageSize = "10",
+            status = "",
+            startDate = "",
+            endDate = "",
+            sort = "DESC",
+        } = req.query;
+
+
+        const params = new URLSearchParams();
+
+        params.set("page", String(page));
+        params.set("pageSize", String(pageSize));
+
+        if (status) {
+            params.set("status", String(status).toUpperCase());
+        }
+
+        if (startDate) {
+            params.set("startDate", String(startDate));
+        }
+
+        if (endDate) {
+            params.set("endDate", String(endDate));
+        }
+
+        params.set("sort", String(sort).toUpperCase());
+
+
+        const response = await fetch(
+            `http://localhost:8000/api/orders?${params.toString()}`,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+        // console.log(await response.json());
+
+        if (!response.status) {
+            throw new Error(
+                `Failed to fetch orders: ${response.status}`
+            );
+        }
+
+
+        const result = await response.json();
+
+
+        res.render("orders", {
+            orders: result.orders,
+            query: {
+                page: String(page),
+                pageSize: String(pageSize),
+                status: String(status),
+                startDate: String(startDate),
+                endDate: String(endDate),
+                sort: String(sort),
+            },
+        });
+
+    } catch (error) {
+        console.error("Orders view error:", error);
+
         res.status(500).send(error.message);
     }
 });
 
+router.get("/orders/:id", async (req, res) => {
+    try {
+        const token = req.cookies.session;
+
+        const { id } = req.params;
+
+        const response = await fetch(
+            `http://localhost:8000/api/orders/${id}`,
+            {
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+            }
+        );
+
+
+        if (!response.status) {
+            throw new Error(
+                `Failed to fetch order: ${response.status}`
+            );
+        }
+
+
+        const result = await response.json();
+
+        console.log(result);
+
+        if ("success" in result && !result.success) {
+            return res.status(404).send(result.message);
+        }
+
+
+        res.render("orderDetails", {
+            order: result,
+        });
+
+    } catch (error) {
+        console.error("Order detail view error:", error);
+
+        res.status(500).send(error.message);
+    }
+});
 
 
 export default router;

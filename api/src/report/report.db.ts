@@ -16,10 +16,10 @@ export async function getSalesSummaryDb(whereClause: string, values: string[]) {
             SUM(o.order_total_amount)               AS total_revenue,
             ROUND(AVG(o.order_total_amount),2)      AS average_order_value
         FROM "order" o
-        WHERE ${whereClause}
-            AND (o.order_status = 'SHIPPED' OR o.order_status = 'DELIVERED')
-            AND (o.history_id IS NULL AND o.flag_deleted = false);
+        WHERE ${whereClause};           
     `;
+
+    console.log(query)
 
     return await pool.query(query, values);
 }

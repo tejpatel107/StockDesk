@@ -9,6 +9,7 @@ import { validate } from "../../middlewares/validate.middleware.js";
 const productRouter : Router = express.Router();
 
 productRouter.get("/", authorizeUser(ROLES.ADMIN,ROLES.STAFF, ROLES.CUSTOMER), getProductsController);
+// productRouter.get("/:id", authorizeUser(ROLES.ADMIN,ROLES.STAFF), getProductByIdController);
 productRouter.post("/", authorizeUser(ROLES.ADMIN), validate({ body : addProductValidationSchema }) ,addNewProductController);
 productRouter.delete("/:id", authorizeUser(ROLES.ADMIN), validate({ params : productIdParamValidationSchema }), deleteProductController);
 productRouter.patch("/:id", authorizeUser(ROLES.ADMIN), validate({ params : productIdParamValidationSchema, body : updateProductValidationSchema }) ,updateProductController);

@@ -1,5 +1,5 @@
 import type { Request } from "express";
-import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb } from "./product.db.js";
+import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb, getProductsByNameDb, getProductsBySkuDb } from "./product.db.js";
 import { error } from "node:console";
 import { randomUUID } from "node:crypto";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
@@ -131,7 +131,7 @@ export async function addNewProductService(req: Request) {
         const products = await getProductsByNameOrSkuDb(sku);
         let product: any = products.length > 0 && products[0];
 
-        console.log(product)
+        console.log(product);
 
         if (product && product.product_sku === sku) {
             throw new ConflictError("Product already exists");
@@ -186,6 +186,7 @@ export async function updateProductService(req: Request) {
     const userId: string = req.user?.userId;
     const { id } = req.params;
     const fields = req.body;
+    const { sku, name } = fields;
 
     try {
 
@@ -193,6 +194,18 @@ export async function updateProductService(req: Request) {
 
         if (!product) {
             throw new Error("Product does not exist, Please try to update existing product!");
+        }
+
+        if (sku) {
+            const { rows: [existingProductWithSku] } = await getProductsBySkuDb(sku);
+            if (existingProductWithSku && existingProductWithSku.product_id !== product.product_id)
+                throw new ConflictError(`Product with sku: ${sku} already exists. Editing is restricted`);
+        }
+
+        if (name) {
+            const { rows: [existingProductWithName] } = await getProductsByNameDb(name);
+            if (existingProductWithName && existingProductWithName.product_id !== product.product_id)
+                throw new ConflictError(`Product with sku: ${sku} already exists. Editing is restricted`);
         }
 
         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
@@ -204,8 +217,10 @@ export async function updateProductService(req: Request) {
             data: { product }
         };
     } catch (error) {
+
+        console.log(error.message);
         return {
-            statusCode: 500,
+            statusCode: (error as ConflictError).statusCode,
             data: {
                 error: (error as any).message
             }
@@ -257,7 +272,7 @@ export async function importProductsService(req: Request) {
         return {
             statusCode: 200,
             data: {
-                "imported" : rowsInserted,
+                "imported": rowsInserted,
                 "failed": errors.length,
                 "errors": errors
             }
