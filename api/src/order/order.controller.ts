@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { createNewOrderService, getOrderByIdForCustomerService, getOrdersService, updateOrderService } from "./order.service.js";
+import { createNewOrderService, getOrderByIdForCustomerService, getOrderByIdForStaffService, getOrdersService, updateOrderService } from "./order.service.js";
 
 
 export async function getOrdersController(req: Request, res: Response) {
@@ -9,6 +9,11 @@ export async function getOrdersController(req: Request, res: Response) {
 
 export async function getOrderByIdForCustomerController(req: Request, res: Response) {
     const result = await getOrderByIdForCustomerService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+
+export async function getOrderByIdForStaffController(req: Request, res: Response) {
+    const result = await getOrderByIdForStaffService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }
 

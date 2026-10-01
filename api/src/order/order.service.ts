@@ -1,7 +1,7 @@
 import type { Request } from "express";
 import { AppError, ValidationError } from "../../utilities/globalErrorHandlers.js";
 import { getOrdersQuerySchema, ORDER_STATUSES } from "../../validators/order.validation.js";
-import { addOrderItems, changeOrderStatusDb, createNewOrderDb, getOrderByIdDb, getOrderByIdForCustomerDb, getOrdersDb, getProductsDb, updateProductQuantityDb } from "./order.db.js";
+import { addOrderItems, changeOrderStatusDb, createNewOrderDb, getOrderByIdDb, getOrderByIdForCustomerDb, getOrderByIdForStaffDb, getOrdersDb, getProductsDb, updateProductQuantityDb } from "./order.db.js";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
@@ -70,6 +70,46 @@ export async function getOrdersService(req: Request): Promise<PaginatedOrders | 
     }
 }
 
+export async function getOrderByIdForStaffService(req: Request) {
+    
+    const { id: orderId } = req.params;
+
+    try {
+        const { rows: orderItems } = await getOrderByIdForStaffDb(orderId as string);
+
+        console.log(orderItems);
+
+        if (orderItems.length === 0) {
+            throw new AppError(`No order found for id: ${orderId}`);
+        }
+
+        const { order_id, customer_name, order_status, order_date, order_total_amount } = orderItems[0];
+
+        const order = {
+            "order id": order_id,
+            "customer name": customer_name,
+            "order status": order_status,
+            "order date": order_date,
+            "order total amount": order_total_amount,
+            "order items": orderItems.map(oi => ({
+                "order item id": oi.order_item_id,
+                "product id": oi.product_id,
+                "product name": oi.product_name,
+                "product unit price at time of order": oi.order_item_unit_price_at_time_of_order,
+                "order item line total": oi.order_item_line_total,
+                "order item quantity": oi.order_item_quantity
+            }))
+        };
+
+        return {
+            statusCode: 200,
+            data: order
+        }
+    } catch (error) {
+        throw new AppError((error as AppError).message)
+    }
+}
+
 export async function getOrderByIdForCustomerService(req: Request) {
 
     const userId = req.user?.userId;
@@ -96,9 +136,9 @@ export async function getOrderByIdForCustomerService(req: Request) {
                 "order item id": oi.order_item_id,
                 "product id": oi.product_id,
                 "product name": oi.product_name,
-                "product unit price at time of order" : oi.order_item_unit_price_at_time_of_order,
-                "order item line total" : oi.order_item_line_total,
-                "order item quantity" : oi.order_item_quantity
+                "product unit price at time of order": oi.order_item_unit_price_at_time_of_order,
+                "order item line total": oi.order_item_line_total,
+                "order item quantity": oi.order_item_quantity
             }))
         };
 

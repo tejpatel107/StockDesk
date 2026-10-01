@@ -50,7 +50,8 @@ export async function loginService(req: Request, res: Response) {
         data: {
             success: true,
             message: "logged in successfully!",
-            jwt: token
+            jwt: token,
+            isStaff: user.role === ROLES.ADMIN || user.role === ROLES.STAFF 
         }
     }
 }

@@ -44,6 +44,7 @@ export async function getOrdersDb(params: any[], whereClause: string, limitIndex
       GROUP BY o.order_id
     )
     SELECT
+      os.order_id,
       cn.customer_name,
       os.order_date,
       os.order_status,
@@ -58,7 +59,7 @@ export async function getOrdersDb(params: any[], whereClause: string, limitIndex
 
 }
 
-export async function getOrderByIdDb(orderId:string) {
+export async function getOrderByIdDb(orderId: string) {
   const query = `
     WITH order_summary AS (
       SELECT 
@@ -84,7 +85,41 @@ export async function getOrderByIdDb(orderId:string) {
     SELECT * FROM order_item_summary;
   `;
 
-  return await pool.query(query, [orderId] );
+  return await pool.query(query, [orderId]);
+}
+
+export async function getOrderByIdForStaffDb(orderId: string) {
+
+  const query = `
+    SELECT
+      o.order_id,
+      u.user_name AS customer_name,
+      o.order_date,
+      o.order_status,
+      o.order_total_amount,
+      oi.order_item_id,
+      p.product_id,
+      p.product_name,
+      oi.order_item_unit_price_at_time_of_order,
+      oi.order_item_line_total,
+      oi.order_item_quantity
+    FROM "order" o
+    LEFT JOIN "customer" c
+      ON c.customer_id = o.customer_id
+      AND c.history_id IS NULL
+    LEFT JOIN "user" u
+      ON u.user_id = c.user_id
+      AND u.history_id IS NULL
+    LEFT JOIN "order_item" oi
+      ON oi.order_id = o.order_id
+    LEFT JOIN "product" p
+      ON p.product_id = oi.product_id
+      AND p.history_id IS NULL
+    WHERE o.order_id = $1
+      AND o.history_id IS NULL
+      AND o.flag_deleted = false;
+  `;
+  return await pool.query(query, [orderId]);
 }
 
 export async function getOrderByIdForCustomerDb(userId: string, orderId: string) {
@@ -259,7 +294,7 @@ export async function updateProductQuantityDb(
 }
 
 export async function changeOrderStatusDb(client: PoolClient, orderId: string, changeLogId: string, status: ORDER_STATUSES) {
-  
+
   const query = `
     UPDATE "order" AS o
     SET order_status = $1, change_log_id = $2

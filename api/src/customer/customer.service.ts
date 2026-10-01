@@ -1,8 +1,11 @@
 import type { Request } from "express";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
-import { deleteCustomerDb, getAllCustomersDb, getCustomerByIdDb, getCustomerByPhoneNumberOrEmailOrNameDb, updateCustomerDetailsInCustomerTableDb, updateCustomerDetailsInUserTableDb } from "./customer.db.js";
+import { addNewCustomerDb, deleteCustomerDb, getAllCustomersDb, getCustomerByIdDb, getCustomerByPhoneNumberDb, getCustomerByPhoneNumberOrEmailOrNameDb, updateCustomerDetailsInCustomerTableDb, updateCustomerDetailsInUserTableDb } from "./customer.db.js";
 import { pool } from "../../../db/db.js";
-import { getUserByIdDb } from "../auth/auth.db.js";
+import { getUserByEmailDb, getUserByIdDb } from "../auth/auth.db.js";
+import { SYSTEM_USER_ID } from "../../config/system.js";
+import { AppError, ConflictError } from "../../utilities/globalErrorHandlers.js";
+import { hashPassword } from "../../utilities/hash.js";
 
 type CustomerUpdate = Partial<{
     name: string,
@@ -187,5 +190,40 @@ export async function deleteCustomerService(req: Request) {
                 error: error.message
             }
         };
+    }
+}
+
+export async function addNewCustomerByStaffService(req: Request) {
+
+    const userId = req.user?.userId;
+
+    const { firstName, lastName, email, password, phoneNumber, address, role } = req.body;
+    let user = await getUserByEmailDb(email);
+
+    if (user) {
+        throw new ConflictError(`Customer with email ${email} already exists!`);
+    }
+
+    let { rows : [customer] } = await getCustomerByPhoneNumberDb(phoneNumber);
+
+    if (customer) {
+        throw new ConflictError(`Customer with phoneNumber ${phoneNumber} already exists!`);
+    }
+
+    const hashedPassword = await hashPassword(password);
+
+    const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
+
+    const client = await pool.connect();
+
+    try {
+        const newCustomer = await addNewCustomerDb(client, (firstName as string).concat(" ", lastName as string), email, phoneNumber, address, hashedPassword, role, changeLog.change_log_id);
+
+        return {
+            statusCode : 201,
+            data: newCustomer
+        }
+    } catch (error) {
+        throw new AppError(error.message);
     }
 }

@@ -57,8 +57,7 @@ export async function getCustomerByPhoneNumberDb(number: number) {
         FROM "customer" AS c 
         WHERE (c.customer_phone_number = $1)
             AND (c.history_id is NULL)
-            AND (c.flag_deleted = false)
-            `;
+            AND (c.flag_deleted = false);`;
     return await pool.query(query, [number]);
 }
 

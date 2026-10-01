@@ -80,115 +80,67 @@
             color: #999;
             pointer-events: none;
         }
+
+        .error {
+            color: #b00020;
+        }
     </style>
 </head>
 
 <body>
-
     <main>
+
+        <%- include('partials/nav', { active: 'orders' }) %>
         <h1>Orders</h1>
 
-        <!-- Filters -->
+        <!-- Filters (still a GET form to the page router) -->
         <form method="GET" action="/orders" class="toolbar card">
-
             <label>
                 Status
                 <select name="status">
                     <option value="">All statuses</option>
-
-                    <option value="PENDING" <%=query.status==="PENDING" ? "selected" : "" %>
-                        >
-                        Pending
-                    </option>
-
-                    <option value="CONFIRMED" <%=query.status==="CONFIRMED" ? "selected" : "" %>
-                        >
-                        Confirmed
-                    </option>
-
-                    <option value="SHIPPED" <%=query.status==="SHIPPED" ? "selected" : "" %>
-                        >
-                        Shipped
-                    </option>
-
-                    <option value="DELIVERED" <%=query.status==="DELIVERED" ? "selected" : "" %>
-                        >
-                        Delivered
-                    </option>
-
-                    <option value="CANCELLED" <%=query.status==="CANCELLED" ? "selected" : "" %>
-                        >
-                        Cancelled
-                    </option>
+                    <% ["PENDING","CONFIRMED","SHIPPED","DELIVERED","CANCELLED"].forEach(s=> { %>
+                        <option value="<%= s %>" <%=query.status===s ? "selected" : "" %>>
+                            <%= s.charAt(0) + s.slice(1).toLowerCase() %>
+                        </option>
+                        <% }) %>
                 </select>
             </label>
 
-
             <label>
                 Start date
-                <input type="date" name="startDate" value="<%= query.startDate || "" %>" />
+                <input type="date" name="startDate" value="<%= query.startDate %>" />
             </label>
-
 
             <label>
                 End date
-                <input type="date" name="endDate" value="<%= query.endDate || "" %>" />
+                <input type="date" name="endDate" value="<%= query.endDate %>" />
             </label>
-
 
             <label>
                 Sort
                 <select name="sort">
-                    <option value="DESC" <%=query.sort==="DESC" || !query.sort ? "selected" : "" %>
-                        >
-                        Newest first
-                    </option>
-
-                    <option value="ASC" <%=query.sort==="ASC" ? "selected" : "" %>
-                        >
-                        Oldest first
-                    </option>
+                    <option value="DESC" <%=query.sort !=="ASC" ? "selected" : "" %>>Newest first</option>
+                    <option value="ASC" <%=query.sort==="ASC" ? "selected" : "" %>>Oldest first</option>
                 </select>
             </label>
-
 
             <label>
                 Page size
                 <select name="pageSize">
-
-                    <option value="10" <%=String(query.pageSize || 10)==="10" ? "selected" : "" %>
-                        >
-                        10
-                    </option>
-
-                    <option value="25" <%=String(query.pageSize)==="25" ? "selected" : "" %>
-                        >
-                        25
-                    </option>
-
-                    <option value="50" <%=String(query.pageSize)==="50" ? "selected" : "" %>
-                        >
-                        50
-                    </option>
-
+                    <% ["10","25","50"].forEach(n=> { %>
+                        <option value="<%= n %>" <%=String(query.pageSize)===n ? "selected" : "" %>><%= n %>
+                        </option>
+                        <% }) %>
                 </select>
             </label>
 
-
-            <button type="submit">
-                Apply
-            </button>
-
-            <a href="/orders">
-                Clear
-            </a>
-
+            <button type="submit">Apply</button>
+            <a href="/orders">Clear</a>
         </form>
 
-
-        <!-- Orders table -->
+        <!-- Orders table (filled by JS) -->
         <div class="card" style="padding: 0">
-
             <table>
                 <thead>
                     <tr>
@@ -200,140 +152,125 @@
                         <th>Date</th>
                     </tr>
                 </thead>
-
                 <tbody id="ordersBody">
-
-                    <% if (orders && orders.length> 0) { %>
-
-                        <% orders.forEach(order=> { %>
-
-                            <tr onclick="handleOrderItem('<%= order.order_id %>')">
-
-                                <td>
-                                    <%= order.order_id %>
-                                </td>
-
-                                <td>
-                                    <%= order.customer_name %>
-                                </td>
-
-                                <td>
-                                    <%= order.order_item_count %>
-                                </td>
-
-                                <td>
-                                    <%= order.order_total_amount %>
-                                </td>
-
-                                <td>
-                                    <%= order.order_status %>
-                                </td>
-
-                                <td>
-                                    <%= new Date(order.order_date).toLocaleDateString() %>
-                                </td>
-
-                            </tr>
-
-                            <% }) %>
-
-                                <% } else { %>
-
-                                    <tr>
-                                        <td colspan="6" class="empty-state">
-                                            No orders found.
-                                        </td>
-                                    </tr>
-
-                                    <% } %>
-
+                    <tr>
+                        <td colspan="6" class="empty-state">Loading...</td>
+                    </tr>
                 </tbody>
             </table>
-
         </div>
 
-
-        <!-- Pagination -->
-        <% const currentPage=Number(query.page || 1); const pageSize=Number(query.pageSize || 10); const
-            totalOrders=Number( orders?.[0]?.total_number_of_orders || 0 ); const totalPages=Math.ceil(totalOrders /
-            pageSize); const createPageUrl=(page)=> {
-            const params = new URLSearchParams();
-
-            params.set("page", page);
-            params.set("pageSize", pageSize);
-
-            if (query.status) {
-            params.set("status", query.status);
-            }
-
-            if (query.startDate) {
-            params.set("startDate", query.startDate);
-            }
-
-            if (query.endDate) {
-            params.set("endDate", query.endDate);
-            }
-
-            if (query.sort) {
-            params.set("sort", query.sort);
-            }
-
-            return `/orders?${params.toString()}`;
-            };
-            %>
-
-
-            <% if (totalPages> 1) { %>
-
-                <div class="pagination">
-
-                    <% if (currentPage> 1) { %>
-
-                        <a href="<%= createPageUrl(currentPage - 1) %>">
-                            Previous
-                        </a>
-
-                        <% } else { %>
-
-                            <span class="disabled">
-                                Previous
-                            </span>
-
-                            <% } %>
-
-
-                                <span>
-                                    Page <%= currentPage %> of <%= totalPages %>
-                                </span>
-
-
-                                <% if (currentPage < totalPages) { %>
-
-                                    <a href="<%= createPageUrl(currentPage + 1) %>">
-                                        Next
-                                    </a>
-
-                                    <% } else { %>
-
-                                        <span class="disabled">
-                                            Next
-                                        </span>
-
-                                        <% } %>
-
-                </div>
-
-                <% } %>
-
+        <div class="pagination" id="pagination"></div>
     </main>
 
-
     <script>
-        function handleOrderItem(id) {
-            window.location.href = `/orders/${id}`;
-        }
-    </script>
+        const API_BASE = "<%= apiBase %>";
+        const TOKEN = "<%= token %>";
+        const QUERY = <%- JSON.stringify(query).replace(/</g, "\\u003c") %>;
 
+        const body = document.getElementById("ordersBody");
+        const pager = document.getElementById("pagination");
+
+        function messageRow(text, cls) {
+            body.innerHTML = "";
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.colSpan = 6;
+            td.className = "empty-state " + (cls || "");
+            td.textContent = text;
+            tr.appendChild(td);
+            body.appendChild(tr);
+        }
+
+        function renderRows(orders) {
+            body.innerHTML = "";
+            if (!orders.length) return messageRow("No orders found.");
+
+            orders.forEach((o) => {
+                const tr = document.createElement("tr");
+                const cells = [
+                    o.order_id,
+                    o.customer_name,
+                    o.order_item_count,
+                    o.order_total_amount,
+                    o.order_status,
+                    new Date(o.order_date).toLocaleDateString(),
+                ];
+                cells.forEach((v) => {
+                    const td = document.createElement("td");
+                    td.textContent = v ?? "";
+                    tr.appendChild(td);
+                });
+                tr.addEventListener("click", () => {
+                    window.location.href = "/orders/" + encodeURIComponent(o.order_id);
+                });
+                body.appendChild(tr);
+            });
+        }
+
+        function pageUrl(page) {
+            const p = new URLSearchParams();
+            p.set("page", page);
+            p.set("pageSize", QUERY.pageSize);
+            ["status", "startDate", "endDate", "sort"].forEach((k) => {
+                if (QUERY[k]) p.set(k, QUERY[k]);
+            });
+            return "/orders?" + p.toString();
+        }
+
+        function renderPagination(total) {
+            pager.innerHTML = "";
+            const current = Number(QUERY.page) || 1;
+            const totalPages = Math.ceil(total / (Number(QUERY.pageSize) || 10));
+            if (totalPages <= 1) return;
+
+            const link = (label, page, enabled) => {
+                const el = document.createElement(enabled ? "a" : "span");
+                el.textContent = label;
+                if (enabled) el.href = pageUrl(page);
+                else el.className = "disabled";
+                pager.appendChild(el);
+            };
+
+            link("Previous", current - 1, current > 1);
+            const info = document.createElement("span");
+            info.textContent = `Page ${current} of ${totalPages}`;
+            pager.appendChild(info);
+            link("Next", current + 1, current < totalPages);
+        }
+
+        async function loadOrders() {
+            const params = new URLSearchParams();
+            params.set("page", QUERY.page);
+            params.set("pageSize", QUERY.pageSize);
+            params.set("sort", QUERY.sort || "DESC");
+            if (QUERY.status) params.set("status", QUERY.status);
+            if (QUERY.startDate) params.set("startDate", QUERY.startDate);
+            if (QUERY.endDate) params.set("endDate", QUERY.endDate);
+
+            try {
+                const res = await fetch(`${API_BASE}/orders?${params}`, {
+                    headers: { Authorization: `Bearer ${TOKEN}` },
+                });
+
+                if (res.status === 401) return (window.location.href = "/login");
+
+                const result = await res.json();
+                if (!res.ok || result.success === false) {
+                    return messageRow(result.message || "Failed to load orders.", "error");
+                }
+
+                const orders = result.orders || [];
+                renderRows(orders);
+                renderPagination(Number(orders[0]?.total_number_of_orders || 0));
+            } catch (err) {
+                console.error(err);
+                messageRow("Could not reach the server.", "error");
+            }
+        }
+
+        loadOrders();
+    </script>
 </body>
 
 </html>

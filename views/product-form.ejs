@@ -76,6 +76,11 @@
             color: white;
         }
 
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .cancel {
             background: #6b7280;
             color: white;
@@ -83,7 +88,7 @@
     </style>
 </head>
 
-<body>
+<body data-api-base="<%= apiBase %>" data-token="<%= token %>">
 
     <div class="container">
 
@@ -91,80 +96,189 @@
             <%= title %>
         </h2>
 
-        <% if (error) { %>
-            <div class="error">
-                <%= error %>
+        <div id="error" class="error" style="display:none"></div>
+
+        <!-- productId is empty on the Add page, set on the Edit page -->
+        <form id="product-form" data-token="<%= token %>"
+            data-product-id="<%= typeof productId !== 'undefined' ? productId : '' %>">
+
+            <div class="form-group">
+                <label for="name">Product Name</label>
+                <input id="name" type="text" name="name" required>
             </div>
-            <% } %>
 
-                <form method="POST" action="<%= product.product_sku
-            ? '/products/' + encodeURIComponent(product.product_sku) + '/edit'
-            : '/products/add' %>">
+            <div class="form-group">
+                <label for="sku">SKU</label>
+                <input id="sku" type="text" name="sku" required>
+            </div>
 
-                    <div class="form-group">
-                        <% if (product.product_id) { %>
-                            <input type="hidden" name="product_id" value="<%= product.product_id %>">
-                            <% } %>
+            <div class="form-group">
+                <label for="price">Price</label>
+                <input id="price" type="number" name="price" min="0" step="0.01" required>
+            </div>
 
-                    </div>
+            <div class="form-group">
+                <label for="quantity">Quantity</label>
+                <input id="quantity" type="number" name="quantity" min="0" required>
+            </div>
 
-                    <div class="form-group">
-                        <label for="name">Product Name</label>
-                        <input type="hidden" name="original_name" value="<%= product.product_name %>">
-                        <input id="name" type="text" name="name" value="<%= product.product_name || '' %>" required>
-                    </div>
+            <div class="form-group">
+                <label for="categoryId">Category</label>
+                <select id="categoryId" name="categoryId" required>
+                    <option value="">Select Category</option>
+                </select>
+            </div>
 
-                    <div class="form-group">
-                        <label for="sku">SKU</label>
-                        <input type="hidden" name="original_sku" value="<%= product.product_sku %>">
-                        <input id="sku" type="text" name="sku" value="<%= product.product_sku || '' %>" required>
-                    </div>
+            <div class="actions">
+                <button id="submit-btn" type="submit">Add Product</button>
+                <a href="/products" class="btn cancel">Cancel</a>
+            </div>
 
-                    <div class="form-group">
-                        <label for="price">Price</label>
-                        <input type="hidden" name="original_price" value="<%= product.product_price %>">
-                        <input id="price" type="number" name="price" value="<%= product.product_price ?? '' %>" min="0"
-                            step="0.01" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="quantity">Quantity</label>
-                        <input type="hidden" name="original_quantity" value="<%= product.product_stock_quantity %>">
-                        <input id="quantity" type="number" name="quantity"
-                            value="<%= product.product_stock_quantity ?? '' %>" min="0" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="categoryId">Category</label>
-                        <input type="hidden" name="original_categoryId" value="<%= product.category_id %>">
-                        <select id="categoryId" name="categoryId" required>
-                            <option value="">Select Category</option>
-
-                            <% categories.forEach(category=> { %>
-                                <option value="<%= category.category_id %>" <%=String(product.category_id ?? ""
-                                    )===String(category.category_id) ? "selected" : "" %>
-                                    >
-                                    <%= category.category_name %>
-                                </option>
-                                <% }) %>
-                        </select>
-                    </div>
-
-                    <div class="actions">
-
-                        <button type="submit">
-                            <%= product.product_sku ? "Update Product" : "Add Product" %>
-                        </button>
-
-                        <a href="/products" class="btn cancel">
-                            Cancel
-                        </a>
-
-                    </div>
-
-                </form>
+        </form>
 
     </div>
+
+    <script>
+        const API_BASE = document.body.dataset.apiBase;
+        const TOKEN = document.body.dataset.token;
+
+        const form = document.getElementById("product-form");
+        const errorBox = document.getElementById("error");
+        const submitBtn = document.getElementById("submit-btn");
+        const token = form.dataset.token;
+        const productId = form.dataset.productId;
+        const isEdit = Boolean(productId);
+
+        // Values as loaded from the API, used to send only changed fields on edit
+        let original = {};
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.style.display = "block";
+            errorBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function clearError() {
+            errorBox.style.display = "none";
+        }
+
+        async function api(path, options = {}) {
+            const res = await fetch(API_BASE + path, {
+                ...options,
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + token,
+                },
+            });
+
+            if (res.status === 401) {
+                window.location.href = "/login";
+                throw new Error("Session expired");
+            }
+
+            const body = await res.json().catch(() => ({}));
+
+            // Error shape: { success: false, message: "..." }
+            if (!res.ok || body.success === false) {
+                throw new Error(body.message || "Request failed (" + res.status + ")");
+            }
+
+            return body;
+        }
+
+        async function init() {
+            try {
+                // Categories come straight from the API
+                const catData = await api("/categories");
+                const categories = catData.categories || catData || [];
+                const select = document.getElementById("categoryId");
+
+                categories.forEach((c) => {
+                    const opt = document.createElement("option");
+                    opt.value = c.category_id;
+                    opt.textContent = c.category_name;
+                    select.appendChild(opt);
+                });
+
+                if (!isEdit) return;
+
+                // Edit: load the product straight from the API
+                submitBtn.textContent = "Update Product";
+                const prodData = await api("/products/" + encodeURIComponent(productId));
+                const p = prodData.product || prodData;
+
+                original = {
+                    name: p.product_name,
+                    sku: p.product_sku,
+                    price: Number(p.product_price),
+                    quantity: Number(p.product_stock_quantity),
+                    categoryId: String(p.category_id),
+                };
+
+                form.name.value = original.name;
+                form.sku.value = original.sku;
+                form.price.value = original.price;
+                form.quantity.value = original.quantity;
+                form.categoryId.value = original.categoryId;
+            } catch (err) {
+                showError(err.message);
+            }
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            clearError();
+
+            const current = {
+                name: form.name.value.trim(),
+                sku: form.sku.value.trim(),
+                price: Number(form.price.value),
+                quantity: Number(form.quantity.value),
+                categoryId: form.categoryId.value,
+            };
+
+            submitBtn.disabled = true;
+
+            try {
+                if (isEdit) {
+                    // PATCH: send only the fields that changed
+                    const changes = {};
+                    for (const key in current) {
+                        if (current[key] !== original[key]) changes[key] = current[key];
+                    }
+
+                    if (Object.keys(changes).length === 0) {
+                        showError("No changes to save");
+                        submitBtn.disabled = false;
+                        return;
+                    }
+
+                    // The PATCH whitelist uses category_id as the key
+                    if ("categoryId" in changes) {
+                        changes.category_id = changes.categoryId;
+                        delete changes.categoryId;
+                    }
+
+                    await api("/products/" + encodeURIComponent(productId), {
+                        method: "PATCH",
+                        body: JSON.stringify(changes),
+                    });
+                } else {
+                    await api("/products", {
+                        method: "POST",
+                        body: JSON.stringify(current),
+                    });
+                }
+
+                window.location.href = "/products";
+            } catch (err) {
+                showError(err.message);
+                submitBtn.disabled = false;
+            }
+        });
+
+        init();
+    </script>
 
 </body>
 

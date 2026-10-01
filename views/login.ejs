@@ -167,8 +167,11 @@
                     throw new Error(data.message || "Login failed");
                 }
 
+                const { isStaff } = data;
+
+                
                 // Login successful
-                window.location.href = "/reports";
+                window.location.href = isStaff ? "/reports" : "/products";
 
             } catch (error) {
                 message.textContent = error.message || "Login failed.";

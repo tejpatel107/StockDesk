@@ -3,7 +3,7 @@ import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, 
 import { error } from "node:console";
 import { randomUUID } from "node:crypto";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
-import { AppError, ConflictError } from "../../utilities/globalErrorHandlers.js";
+import { AppError, ConflictError, NotFoundError } from "../../utilities/globalErrorHandlers.js";
 import { csvRowValidationSchema } from "../../validators/productValidation.js";
 import { pool } from "../../../db/db.js";
 import { parse } from "csv-parse/sync";
@@ -119,6 +119,21 @@ export async function getProductsWithinStockService(req: Request) {
     }
 }
 
+export async function getProductByIdService(req: Request) {
+
+    const { id } = req.params;
+    
+    const { rows: [product] } = await getProductByIdDb(id as string);
+
+    if (!product)
+        throw new NotFoundError(`Product for id: ${id} does not exist!`);
+
+    return {
+        statusCode: 200,
+        data: product
+    };
+}
+
 export async function addNewProductService(req: Request) {
 
     const { name, price, quantity, sku, categoryId } = req.body;
@@ -126,31 +141,23 @@ export async function addNewProductService(req: Request) {
 
     console.log(userId);
 
-    try {
 
-        const products = await getProductsByNameOrSkuDb(sku);
-        let product: any = products.length > 0 && products[0];
+    const products = await getProductsByNameOrSkuDb(sku);
+    let product: any = products.length > 0 && products[0];
 
-        console.log(product);
+    console.log(product);
 
-        if (product && product.product_sku === sku) {
-            throw new ConflictError("Product already exists");
-        }
-
-        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-        product = await addNewProductDb(randomUUID(), name, sku, price, quantity, categoryId, userId, changeLogId);
-        return {
-            statusCode: 201,
-            data: { product }
-        };
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
+    if (product && product.product_sku === sku) {
+        throw new ConflictError("Product already exists");
     }
+
+    const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
+    product = await addNewProductDb(randomUUID(), name, sku, price, quantity, categoryId, userId, changeLogId);
+    return {
+        statusCode: 201,
+        data: { product }
+    };
+
 }
 
 export async function deleteProductService(req: Request) {
@@ -160,7 +167,7 @@ export async function deleteProductService(req: Request) {
 
     try {
 
-        let { rows : [product] } = await getProductByIdDb(id as string);
+        let { rows: [product] } = await getProductByIdDb(id as string);
 
         if (!product) {
             throw new Error("Product not found!");
@@ -169,7 +176,7 @@ export async function deleteProductService(req: Request) {
         console.log(product);
 
         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-        
+
         product = await deleteProductDb(product, userId, changeLogId);
 
         return {

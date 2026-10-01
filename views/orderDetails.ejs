@@ -119,106 +119,46 @@
 </head>
 
 <body>
-
     <main>
-
-        <!-- Header -->
+        <%- include('partials/nav', { active: 'orders' }) %>
         <div class="toolbar">
-
-            <h1>
-                Order #<%= order["order id"] %>
-            </h1>
-
+            <h1>Order <span id="titleId"></span></h1>
             <div class="spacer"></div>
-
-            <a href="/orders" class="btn secondary">
-                Back to Orders
-            </a>
-
+            <a href="/orders" class="btn secondary">Back to Orders</a>
         </div>
 
-
-        <!-- Order information -->
         <div class="card">
+            <div id="errorBox" class="empty-state" style="display:none; color:#b00020;"></div>
 
             <div class="detail-grid">
-
                 <div class="detail-item">
-                    <div class="detail-label">
-                        Order ID
-                    </div>
-
-                    <div class="detail-value">
-                        <%= order["order id"] %>
-                    </div>
+                    <div class="detail-label">Order ID</div>
+                    <div class="detail-value" id="fId">Loading...</div>
                 </div>
-
-
                 <div class="detail-item">
-                    <div class="detail-label">
-                        Customer
-                    </div>
-
-                    <div class="detail-value">
-                        <%= order["customer name"] %>
-                    </div>
+                    <div class="detail-label">Customer</div>
+                    <div class="detail-value" id="fCustomer"></div>
                 </div>
-
-
                 <div class="detail-item">
-                    <div class="detail-label">
-                        Status
-                    </div>
-
-                    <div class="detail-value">
-                        <span class="status">
-                            <%= order["order status"] %>
-                        </span>
-                    </div>
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value"><span class="status" id="fStatus"></span></div>
                 </div>
-
-
                 <div class="detail-item">
-                    <div class="detail-label">
-                        Order Date
-                    </div>
-
-                    <div class="detail-value">
-                        <%= new Date(order["order date"]).toLocaleDateString() %>
-                    </div>
+                    <div class="detail-label">Order Date</div>
+                    <div class="detail-value" id="fDate"></div>
                 </div>
-
-
                 <div class="detail-item">
-                    <div class="detail-label">
-                        Total Amount
-                    </div>
-
-                    <div class="detail-value">
-                        ₹<%= order["order total amount"] %>
-                    </div>
+                    <div class="detail-label">Total Amount</div>
+                    <div class="detail-value" id="fTotal"></div>
                 </div>
-
             </div>
 
-
-            <!-- Status actions -->
-            <div id="statusActions">
-                <!-- Status update buttons can be added here later -->
-            </div>
-
+            <div id="statusActions"></div>
         </div>
 
-
-        <!-- Order items -->
         <div class="card">
-
-            <h2 style="margin-bottom: 15px;">
-                Order Items
-            </h2>
-
+            <h2 style="margin-bottom: 15px;">Order Items</h2>
             <table class="line-items">
-
                 <thead>
                     <tr>
                         <th>Product</th>
@@ -226,54 +166,94 @@
                         <th>Order Item ID</th>
                     </tr>
                 </thead>
-
                 <tbody id="itemsBody">
-
-                    <% if (order["order items"] && order["order items"].length> 0) { %>
-
-                        <% order["order items"].forEach(item=> { %>
-
-                            <tr>
-
-                                <td>
-                                    <%= item["product name"] %>
-                                </td>
-
-                                <td>
-                                    <%= item["product id"] %>
-                                </td>
-
-                                <td>
-                                    <%= item["order item id"] %>
-                                </td>
-
-                            </tr>
-
-                            <% }) %>
-
-                                <% } else { %>
-
-                                    <tr>
-                                        <td colspan="3" class="empty-state">
-                                            No items found for this order.
-                                        </td>
-                                    </tr>
-
-                                    <% } %>
-
+                    <tr>
+                        <td colspan="3" class="empty-state">Loading...</td>
+                    </tr>
                 </tbody>
-
             </table>
-
         </div>
-
     </main>
 
-
     <script>
-        // Status update functionality can be added here.
-    </script>
+        const API_BASE = "<%= apiBase %>";
+        const TOKEN = "<%= token %>";
+        const ORDER_ID = <%- JSON.stringify(orderId).replace(/</g, "\\u003c") %>;
 
+        // API keys may use underscores or spaces; accept either
+        const pick = (obj, ...keys) => {
+            for (const k of keys) if (obj && obj[k] !== undefined) return obj[k];
+            return undefined;
+        };
+        const setText = (id, v) => (document.getElementById(id).textContent = v ?? "");
+
+        function showError(msg) {
+            const box = document.getElementById("errorBox");
+            box.textContent = msg;
+            box.style.display = "block";
+            setText("fId", ORDER_ID);
+            document.getElementById("itemsBody").innerHTML =
+                '<tr><td colspan="3" class="empty-state">No items to show.</td></tr>';
+        }
+
+        function renderItems(items) {
+            const tbody = document.getElementById("itemsBody");
+            tbody.innerHTML = "";
+
+            if (!items || !items.length) {
+                tbody.innerHTML =
+                    '<tr><td colspan="3" class="empty-state">No items found for this order.</td></tr>';
+                return;
+            }
+
+            items.forEach((item) => {
+                const tr = document.createElement("tr");
+                [
+                    pick(item, "product_name", "product name"),
+                    pick(item, "product_id", "product id"),
+                    pick(item, "order_item_id", "order item id"),
+                ].forEach((v) => {
+                    const td = document.createElement("td");
+                    td.textContent = v ?? "";
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function loadOrder() {
+            try {
+                const res = await fetch(
+                    `${API_BASE}/orders/staff/${encodeURIComponent(ORDER_ID)}`,
+                    { headers: { Authorization: `Bearer ${TOKEN}` } }
+                );
+
+                if (res.status === 401) return (window.location.href = "/login");
+
+                const result = await res.json();
+                if (!res.ok || result.success === false) {
+                    return showError(result.message || "Order not found.");
+                }
+
+                const order = result.order || result;
+                const id = pick(order, "order_id", "order id");
+
+                setText("titleId", "#" + id);
+                setText("fId", id);
+                setText("fCustomer", pick(order, "customer_name", "customer name"));
+                setText("fStatus", pick(order, "order_status", "order status"));
+                setText("fDate", new Date(pick(order, "order_date", "order date")).toLocaleDateString());
+                setText("fTotal", "₹" + pick(order, "order_total_amount", "order total amount"));
+
+                renderItems(pick(order, "order_items", "order items"));
+            } catch (err) {
+                console.error(err);
+                showError("Could not reach the server.");
+            }
+        }
+
+        loadOrder();
+    </script>
 </body>
 
 </html>

@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { getAllProductsService, getProductsByCategoryIdService, getProductsByNameOrSkuService, getProductsWithinStockService, getProductsWithinPriceRangeService, addNewProductService, deleteProductService, updateProductService, importProductsService } from "./product.service.js";
+import { getAllProductsService, getProductsByCategoryIdService, getProductsByNameOrSkuService, getProductsWithinStockService, getProductsWithinPriceRangeService, addNewProductService, deleteProductService, updateProductService, importProductsService, getProductByIdService } from "./product.service.js";
 
 export async function getProductsController(req: Request, res: Response) {
     const { categoryId, search, minPrice, maxPrice, inStock } = req.query;
@@ -42,22 +42,27 @@ async function getProductsWithinStock(req: Request, res: Response) {
     return res.status(result?.statusCode as number).json(result?.data);
 }
 
+export async function getProductByIdController(req: Request, res: Response) {
+    const result = await getProductByIdService(req);
+    return res.status(result?.statusCode as number).json(result?.data);
+}
+
 export async function addNewProductController(req: Request, res: Response) {
     const result = await addNewProductService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }
 
-export async function deleteProductController(req: Request, res: Response){
+export async function deleteProductController(req: Request, res: Response) {
     const result = await deleteProductService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }
 
-export async function updateProductController(req: Request, res: Response){
+export async function updateProductController(req: Request, res: Response) {
     const result = await updateProductService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }
 
-export async function importProductsController(req: Request, res: Response){
+export async function importProductsController(req: Request, res: Response) {
     const result = await importProductsService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 }

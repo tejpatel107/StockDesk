@@ -1,0 +1,55 @@
+<style>
+    .main-nav {
+        display: flex;
+        gap: 8px;
+        padding: 10px 0;
+        margin-bottom: 16px;
+        border-bottom: 1px solid #ccc;
+    }
+
+    .main-nav a {
+        padding: 6px 12px;
+        text-decoration: none;
+        color: #333;
+        border: 1px solid transparent;
+        border-radius: 4px;
+    }
+
+    .main-nav a:hover {
+        background: #eee;
+    }
+
+    .main-nav a.active {
+        font-weight: bold;
+        border-color: #ccc;
+        background: #f5f5f5;
+    }
+
+    .main-nav .logout-form {
+        margin: 0 0 0 auto;
+    }
+
+    .main-nav .logout-btn {
+        padding: 6px 12px;
+        color: #333;
+        background: none;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .main-nav .logout-btn:hover {
+        background: #eee;
+    }
+</style>
+
+<nav class="main-nav">
+    <a href="/products" class="<%= active === 'products' ? 'active' : '' %>">Products</a>
+    <a href="/orders" class="<%= active === 'orders' ? 'active' : '' %>">Orders</a>
+    <a href="/reports" class="<%= active === 'reports' ? 'active' : '' %>">Reports</a>
+
+    <form action="/logout" method="POST" class="logout-form">
+        <button type="submit" class="logout-btn">Logout</button>
+    </form>
+</nav>

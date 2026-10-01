@@ -55,6 +55,7 @@ export function authorizeUser(...roles: ROLES[]) {
 
     return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
 
+
         if (!req.user) {
             return next(new AuthError("Unauthenticated, please login first!", 401));
         }
@@ -62,7 +63,7 @@ export function authorizeUser(...roles: ROLES[]) {
         if (!roles.includes(req.user.role)) {
             return next(new AuthError("You are not authorized to access this reosurce.", 403));
         }
-
+        
         next();
     }
 }

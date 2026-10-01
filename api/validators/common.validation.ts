@@ -30,3 +30,13 @@ export const paginationQueryValidationSchema = z.object({
 export const listQueryValidationSchema = paginationQueryValidationSchema.extend({
   search: z.string().trim().max(100).optional(),
 });
+
+export const addressValidation = z.object({
+    unitNumber: z.number().optional(),
+    streetNumber: z.number().optional(),
+    street: z.string(),
+    city: z.string(),
+    state: z.string(),
+    postalCode: z.string(),
+    country: z.string()
+});

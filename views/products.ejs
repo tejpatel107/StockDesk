@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Products | Stock Desk</title>
 
     <style>
@@ -103,234 +102,215 @@
             padding: 20px;
             color: #777;
         }
+
+        .error {
+            color: #dc2626;
+        }
     </style>
 </head>
 
-<body>
+<body data-api-base="<%= apiBase %>" data-token="<%= token %>">
 
     <main class="container">
 
-        <h1>Products</h1>
+        <%- include('partials/nav', { active: 'products' }) %>
 
-        <div class="card">
+            <h1>Products</h1>
 
-            <a href="/products/add" class="btn btn-success">
-                Add Product
-            </a>
+            <div class="card">
+                <a href="/products/add" class="btn btn-success">Add Product</a>
+            </div>
 
-        </div>
+            <!-- Filters (plain GET form; state lives in the URL) -->
+            <div class="card">
+                <form method="GET" action="/products" id="filter-form">
+                    <div class="filters">
+                        <input type="text" name="search" placeholder="Search name or SKU">
 
-        <!-- Filters -->
-
-        <div class="card">
-
-            <form method="GET" action="/products">
-
-                <div class="filters">
-
-                    <!-- Search by product name or SKU -->
-
-                    <input type="text" name="search" value="<%= query.search %>" placeholder="Search name or SKU">
-
-
-                    <!-- Category -->
-
-                    <select name="categoryId">
-                        <option value="">All Categories</option>
-
-                        <% categories.forEach(category=> { %>
-                            <option value="<%= category.category_id %>">
-                                <%= category.category_name %>
-                            </option>
-                            <% }); %>
-                    </select>
-
-
-                    <!-- Stock -->
-
-                    <select name="inStock">
-
-                        <option value="">
-                            All Stock
-                        </option>
-
-                        <option value="true" <%=query.inStock==="true" ? "selected" : "" %>
-                            >
-                            In Stock
-                        </option>
-
-                        <option value="false" <%=query.inStock==="false" ? "selected" : "" %>
-                            >
-                            Out of Stock
-                        </option>
-
-                    </select>
-
-
-                    <!--
-                        Page size.
-
-                        This is ready for the API once pageSize
-                        is supported.
-
-                        Uncomment/use when required.
-
-                        <select name="pageSize">
-                            <option value="10">10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
+                        <select name="categoryId" id="category-select">
+                            <option value="">All Categories</option>
                         </select>
-                    -->
 
+                        <select name="inStock">
+                            <option value="">All Stock</option>
+                            <option value="true">In Stock</option>
+                            <option value="false">Out of Stock</option>
+                        </select>
 
-                    <button type="submit" class="btn btn-primary">
-                        Search
-                    </button>
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </div>
+                </form>
+            </div>
 
-                </div>
+            <!-- Products -->
+            <div class="card">
+                <p id="error" class="error" hidden></p>
 
-            </form>
-
-        </div>
-
-
-        <!-- Products -->
-
-        <div class="card">
-
-            <table>
-
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>SKU</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                        <th>Stock</th>
-                        <th>Category</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                    <% if (products.length===0) { %>
-
+                <table>
+                    <thead>
                         <tr>
-                            <td colspan="7" class="empty">
-                                No products found
-                            </td>
+                            <th>Name</th>
+                            <th>SKU</th>
+                            <th>Price</th>
+                            <th>Quantity</th>
+                            <th>Stock</th>
+                            <th>Category</th>
+                            <th>Action</th>
                         </tr>
+                    </thead>
+                    <tbody id="product-rows">
+                        <tr>
+                            <td colspan="7" class="empty">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
 
-                        <% } %>
-
-
-                            <% products.forEach(product=> { %>
-
-                                <tr>
-
-                                    <td>
-                                        <%= product.product_name %>
-                                    </td>
-
-                                    <td>
-                                        <%= product.product_sku %>
-                                    </td>
-
-                                    <td>
-                                        ₹<%= product.product_price %>
-                                    </td>
-
-                                    <td>
-                                        <%= product.product_stock_quantity %>
-                                    </td>
-
-                                    <td>
-
-                                        <% if (product.product_stock_quantity> 0) { %>
-
-                                            <span class="in-stock">
-                                                In Stock
-                                            </span>
-
-                                            <% } else { %>
-
-                                                <span class="out-of-stock">
-                                                    Out of Stock
-                                                </span>
-
-                                                <% } %>
-
-                                    </td>
-
-                                    <td>
-                                        <%= product.category_name || "-" %>
-                                    </td>
-
-                                    <td>
-                                        <a href="/products/<%= product.product_sku %>/edit" class="btn btn-secondary">
-                                            Edit
-                                        </a>
-
-                                    </td>
-
-                                </tr>
-
-                                <% }) %>
-
-                </tbody>
-
-            </table>
-
-
-            <!-- Pagination -->
-
-            <% const currentPage=Number(pagination.page) || 1; const totalPages=Number(pagination.totalPages) || 1; %>
-
-
-                <div class="pagination">
-
-                    <% if (currentPage> 1) { %>
-
-                        <a class="btn btn-secondary" href="/products?<%= new URLSearchParams({
-                            page: currentPage - 1,
-                            search: query.search || "",
-                            categoryId: query.categoryId || "",
-                            inStock: query.inStock || "",
-                            pageSize: query.pageSize || ""
-                        }).toString() %>">
-                            Previous
-                        </a>
-
-                        <% } %>
-
-
-                            <span>
-                                Page <%= currentPage %> of <%= totalPages %>
-                            </span>
-
-
-                            <% if (currentPage < totalPages) { %>
-
-                                <a class="btn btn-primary" href="/products?<%= new URLSearchParams({
-                            page: currentPage + 1,
-                            search: query.search || "",
-                            categoryId: query.categoryId || "",
-                            inStock: query.inStock || "",
-                            pageSize: query.pageSize || ""
-                        }).toString() %>">
-                                    Next
-                                </a>
-
-                                <% } %>
-
-                </div>
-
-        </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
 
     </main>
+
     <script>
-        console.log("Categories from EJS:", <% JSON.stringify(categories) %>);
+        const API_BASE = document.body.dataset.apiBase;
+        const TOKEN = document.body.dataset.token;
+        const query = new URLSearchParams(window.location.search);
+
+        const form = document.getElementById("filter-form");
+        const categorySelect = document.getElementById("category-select");
+        const rowsEl = document.getElementById("product-rows");
+        const paginationEl = document.getElementById("pagination");
+        const errorEl = document.getElementById("error");
+
+        async function api(path) {
+            const res = await fetch(`${API_BASE}${path}`, {
+                headers: { Authorization: `Bearer ${TOKEN}` },
+            });
+
+            if (res.status === 401) {
+                window.location.href = "/login";
+                return null;
+            }
+            if (!res.ok) {
+                throw new Error(`API request failed (${res.status}): ${path}`);
+            }
+            return res.json();
+        }
+
+        function el(tag, text, className) {
+            const node = document.createElement(tag);
+            if (text !== undefined) node.textContent = text;
+            if (className) node.className = className;
+            return node;
+        }
+
+        function pageUrl(page) {
+            const p = new URLSearchParams(window.location.search);
+            p.set("page", page);
+            return `/products?${p.toString()}`;
+        }
+
+        function renderProducts(products, categoryMap) {
+            rowsEl.replaceChildren();
+
+            if (products.length === 0) {
+                const tr = el("tr");
+                const td = el("td", "No products found", "empty");
+                td.colSpan = 7;
+                tr.appendChild(td);
+                rowsEl.appendChild(tr);
+                return;
+            }
+
+            for (const product of products) {
+                const tr = el("tr");
+                const inStock = product.product_stock_quantity > 0;
+
+                tr.appendChild(el("td", product.product_name));
+                tr.appendChild(el("td", product.product_sku));
+                tr.appendChild(el("td", `₹${product.product_price}`));
+                tr.appendChild(el("td", product.product_stock_quantity));
+
+                const stockTd = el("td");
+                stockTd.appendChild(
+                    el("span", inStock ? "In Stock" : "Out of Stock", inStock ? "in-stock" : "out-of-stock")
+                );
+                tr.appendChild(stockTd);
+
+                tr.appendChild(el("td", categoryMap.get(product.category_id) || "-"));
+
+                const actionTd = el("td");
+                const edit = el("a", "Edit", "btn btn-secondary");
+                edit.href = `/products/${encodeURIComponent(product.product_id)}/edit`;
+                actionTd.appendChild(edit);
+                tr.appendChild(actionTd);
+
+                rowsEl.appendChild(tr);
+            }
+        }
+
+        function renderPagination(page, totalPages) {
+            paginationEl.replaceChildren();
+
+            if (page > 1) {
+                const prev = el("a", "Previous", "btn btn-secondary");
+                prev.href = pageUrl(page - 1);
+                paginationEl.appendChild(prev);
+            }
+
+            paginationEl.appendChild(el("span", `Page ${page} of ${totalPages}`));
+
+            if (page < totalPages) {
+                const next = el("a", "Next", "btn btn-primary");
+                next.href = pageUrl(page + 1);
+                paginationEl.appendChild(next);
+            }
+        }
+
+        async function load() {
+            // Restore filter values from the URL
+            form.elements.search.value = query.get("search") || "";
+            form.elements.inStock.value = query.get("inStock") || "";
+
+            // Only forward the params the API supports
+            const params = new URLSearchParams();
+            params.set("page", query.get("page") || "1");
+            for (const key of ["pageSize", "search", "categoryId", "inStock"]) {
+                if (query.get(key)) params.set(key, query.get(key));
+            }
+
+            try {
+                const [productResult, categoryResult] = await Promise.all([
+                    api(`/products?${params.toString()}`),
+                    api("/categories"),
+                ]);
+                if (!productResult || !categoryResult) return; // redirected to login
+
+                const categories = categoryResult.categories || [];
+                const products = productResult.products || [];
+
+                for (const category of categories) {
+                    const option = el("option", category.category_name);
+                    option.value = category.category_id;
+                    categorySelect.appendChild(option);
+                }
+                categorySelect.value = query.get("categoryId") || "";
+
+                const categoryMap = new Map(categories.map(c => [c.category_id, c.category_name]));
+
+                renderProducts(products, categoryMap);
+                renderPagination(
+                    Number(productResult.page) || Number(query.get("page")) || 1,
+                    Number(productResult.totalPages) || 1
+                );
+            } catch (err) {
+                console.error(err);
+                rowsEl.replaceChildren();
+                errorEl.textContent = err.message;
+                errorEl.hidden = false;
+            }
+        }
+
+        load();
     </script>
 </body>
 
