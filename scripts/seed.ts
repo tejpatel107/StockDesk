@@ -1,17 +1,61 @@
 import bcrypt from "bcrypt";
-import { randomUUID } from "node:crypto";
 import { pool } from "../db/db.js";
+import {
+  SYSTEM_USER_ID,
+  SYSTEM_CHANGE_LOG_ID,
+  SYSTEM_USER_EMAIL,
+  SYSTEM_ROLE,
+} from "../api/config/system.js";
 
+// --------------------------------------------------
+// System user constants.
+// Move these to a shared config (e.g. src/config/system.ts) so that
+// /login can reject SYSTEM_USER_ID and /signup can use it as the actor.
+// --------------------------------------------------
 const client = await pool.connect();
+
+// Inserts a change_log row for the given actor and returns the DB-generated id.
+async function createChangeLog(actorUserId: string): Promise<string> {
+  const result = await client.query(
+    `
+      INSERT INTO "change_log" (user_id, change_log_timestamp)
+      VALUES ($1, NOW())
+      RETURNING change_log_id
+    `,
+    [actorUserId]
+  );
+  return result.rows[0].change_log_id;
+}
+
+// Inserts a user and returns the DB-generated user_id.
+async function createUser(
+  name: string,
+  email: string,
+  passwordHash: string,
+  role: string,
+  changeLogId: string
+): Promise<string> {
+  const result = await client.query(
+    `
+      INSERT INTO "user" (
+        user_name,
+        user_email,
+        user_password,
+        user_role,
+        flag_deleted,
+        history_id,
+        change_log_id
+      )
+      VALUES ($1, $2, $3, $4, false, NULL, $5)
+      RETURNING user_id
+    `,
+    [name, email, passwordHash, role, changeLogId]
+  );
+  return result.rows[0].user_id;
+}
 
 try {
   await client.query("BEGIN");
-
-  // --------------------------------------------------
-  // Temporarily disable FK triggers.
-  // Required because user <-> change_log are circular.
-  // --------------------------------------------------
-  await client.query("SET session_replication_role = replica");
 
   // --------------------------------------------------
   // Clear existing seed data
@@ -32,17 +76,23 @@ try {
   `);
 
   // --------------------------------------------------
-  // IDs
+  // System user (bootstrap)
+  //
+  // user <-> change_log is circular, so this is the only place
+  // where ids are fixed. change_log goes first; its user_id FK
+  // (change_log_fk1, DEFERRABLE INITIALLY DEFERRED) is checked at COMMIT.
+  //
+  // The password '!' can never match a bcrypt comparison, and /login
+  // should also reject SYSTEM_USER_ID explicitly.
   // --------------------------------------------------
 
-  const adminUserId = randomUUID();
-  const staffUserId = randomUUID();
-
-  // --------------------------------------------------
-  // Users
-  // --------------------------------------------------
-
-  const passwordHash = await bcrypt.hash("Password123!", 10);
+  await client.query(
+    `
+      INSERT INTO "change_log" (change_log_id, user_id, change_log_timestamp)
+      VALUES ($1, $2, NOW())
+    `,
+    [SYSTEM_CHANGE_LOG_ID, SYSTEM_USER_ID]
+  );
 
   await client.query(
     `
@@ -56,28 +106,35 @@ try {
         history_id,
         change_log_id
       )
-      VALUES
-        ($1, $2, $3, $4, $5, false, NULL, $6),
-        ($7, $8, $9, $4, $10, false, NULL, $11)
+      VALUES ($1, 'System', $2, '!', $3, false, NULL, $4)
     `,
-    [
-      adminUserId,
-      "Admin User",
-      "admin@stockdesk.com",
-      passwordHash,
-      "ADMIN",
-      randomUUID(),
-
-      staffUserId,
-      "Staff User",
-      "staff@stockdesk.com",
-      "STAFF",
-      randomUUID(),
-    ]
+    [SYSTEM_USER_ID, SYSTEM_USER_EMAIL, SYSTEM_ROLE, SYSTEM_CHANGE_LOG_ID]
   );
 
   // --------------------------------------------------
-  // Categories
+  // Admin and staff users (created by the system user)
+  // --------------------------------------------------
+
+  const passwordHash = await bcrypt.hash("Password123!", 10);
+
+  await createUser(
+    "Admin User",
+    "admin@stockdesk.com",
+    passwordHash,
+    "ADMIN",
+    await createChangeLog(SYSTEM_USER_ID)
+  );
+
+  await createUser(
+    "Staff User",
+    "staff@stockdesk.com",
+    passwordHash,
+    "STAFF",
+    await createChangeLog(SYSTEM_USER_ID)
+  );
+
+  // --------------------------------------------------
+  // Categories (created by the system user)
   // --------------------------------------------------
 
   const categories = [
@@ -106,27 +163,29 @@ try {
   const categoryIds: string[] = [];
 
   for (const category of categories) {
-    const categoryId = randomUUID();
-    categoryIds.push(categoryId);
-
-    await client.query(
+    const result = await client.query(
       `
         INSERT INTO "category" (
-          category_id,
           category_name,
           category_description,
           flag_deleted,
           history_id,
           change_log_id
         )
-        VALUES ($1, $2, $3, false, NULL, $4)
+        VALUES ($1, $2, false, NULL, $3)
+        RETURNING category_id
       `,
-      [categoryId, category.name, category.description, randomUUID()]
+      [
+        category.name,
+        category.description,
+        await createChangeLog(SYSTEM_USER_ID),
+      ]
     );
+    categoryIds.push(result.rows[0].category_id);
   }
 
   // --------------------------------------------------
-  // Suppliers
+  // Suppliers (created by the system user)
   // --------------------------------------------------
 
   const suppliers = [
@@ -140,13 +199,9 @@ try {
   const supplierIds: string[] = [];
 
   for (const [name, email, phone] of suppliers) {
-    const supplierId = randomUUID();
-    supplierIds.push(supplierId);
-
-    await client.query(
+    const result = await client.query(
       `
         INSERT INTO "supplier" (
-          supplier_id,
           supplier_name,
           supplier_email,
           supplier_phone_number,
@@ -154,31 +209,29 @@ try {
           history_id,
           change_log_id
         )
-        VALUES ($1, $2, $3, $4, false, NULL, $5)
+        VALUES ($1, $2, $3, false, NULL, $4)
+        RETURNING supplier_id
       `,
-      [supplierId, name, email, phone, randomUUID()]
+      [name, email, phone, await createChangeLog(SYSTEM_USER_ID)]
     );
+    supplierIds.push(result.rows[0].supplier_id);
   }
 
   // --------------------------------------------------
-  // Products - 50
+  // Products - 50 (created by the system user)
   // --------------------------------------------------
 
   const productIds: string[] = [];
 
   for (let i = 1; i <= 50; i++) {
-    const productId = randomUUID();
-    productIds.push(productId);
-
     const categoryId = categoryIds[(i - 1) % categoryIds.length];
 
     const price = 500 + i * 250;
     const stock = 10 + (i % 41);
 
-    await client.query(
+    const productResult = await client.query(
       `
         INSERT INTO "product" (
-          product_id,
           product_name,
           product_sku,
           product_price,
@@ -188,20 +241,21 @@ try {
           history_id,
           change_log_id
         )
-        VALUES (
-          $1, $2, $3, $4, $5, $6, false, NULL, $7
-        )
+        VALUES ($1, $2, $3, $4, $5, false, NULL, $6)
+        RETURNING product_id
       `,
       [
-        productId,
         `Product ${i}`,
         `SKU-${String(i).padStart(4, "0")}`,
         price,
         stock,
         categoryId,
-        randomUUID(),
+        await createChangeLog(SYSTEM_USER_ID),
       ]
     );
+
+    const productId: string = productResult.rows[0].product_id;
+    productIds.push(productId);
 
     // Assign 1-2 suppliers to each product
     const supplier1 = supplierIds[(i - 1) % supplierIds.length];
@@ -236,56 +290,31 @@ try {
   }
 
   // --------------------------------------------------
-  // Customer users
+  // Customers - 10
   //
-  // Because customer.user_id is NOT NULL UNIQUE,
-  // each customer needs its own user account.
+  // Mirrors the signup flow: one change_log row (actor = system user)
+  // is shared by the customer's user row and the customer row.
+  // customer.user_id is NOT NULL UNIQUE, so each customer needs its own user.
   // --------------------------------------------------
 
   const customerUserIds: string[] = [];
-
-  for (let i = 1; i <= 10; i++) {
-    const userId = randomUUID();
-    customerUserIds.push(userId);
-
-    await client.query(
-      `
-        INSERT INTO "user" (
-          user_id,
-          user_name,
-          user_email,
-          user_password,
-          user_role,
-          flag_deleted,
-          history_id,
-          change_log_id
-        )
-        VALUES ($1, $2, $3, $4, 'CUSTOMER', false, NULL, $5)
-      `,
-      [
-        userId,
-        `Customer ${i}`,
-        `customer${i}@stockdesk.com`,
-        passwordHash,
-        randomUUID(),
-      ]
-    );
-  }
-
-  // --------------------------------------------------
-  // Customers - 10
-  // --------------------------------------------------
-
   const customerIds: string[] = [];
 
   for (let i = 1; i <= 10; i++) {
-    const customerId = randomUUID();
-    customerIds.push(customerId);
+    const changeLogId = await createChangeLog(SYSTEM_USER_ID);
 
-    await client.query(
+    const userId = await createUser(
+      `Customer ${i}`,
+      `customer${i}@stockdesk.com`,
+      passwordHash,
+      "CUSTOMER",
+      changeLogId
+    );
+    customerUserIds.push(userId);
+
+    const customerResult = await client.query(
       `
         INSERT INTO "customer" (
-          customer_id,
           customer_phone_number,
           customer_address,
           user_id,
@@ -293,20 +322,21 @@ try {
           history_id,
           change_log_id
         )
-        VALUES ($1, $2, $3, $4, false, NULL, $5)
+        VALUES ($1, $2, $3, false, NULL, $4)
+        RETURNING customer_id
       `,
       [
-        customerId,
         `+91-90000000${String(i).padStart(2, "0")}`,
         `${i} Main Street, Ahmedabad`,
-        customerUserIds[i - 1],
-        randomUUID(),
+        userId,
+        changeLogId,
       ]
     );
+    customerIds.push(customerResult.rows[0].customer_id);
   }
 
   // --------------------------------------------------
-  // Orders - 20
+  // Orders - 20 (each placed by the customer's own user)
   // --------------------------------------------------
 
   const statuses = [
@@ -317,9 +347,9 @@ try {
   ];
 
   for (let i = 1; i <= 20; i++) {
-    const orderId = randomUUID();
-
-    const customerId = customerIds[(i - 1) % customerIds.length];
+    const customerIndex = (i - 1) % customerIds.length;
+    const customerId = customerIds[customerIndex];
+    const customerUserId = customerUserIds[customerIndex];
 
     const orderDate = new Date();
     orderDate.setDate(orderDate.getDate() - i);
@@ -362,10 +392,9 @@ try {
 
     const totalAmount = lineTotal1 + lineTotal2;
 
-    await client.query(
+    const orderResult = await client.query(
       `
         INSERT INTO "order" (
-          order_id,
           customer_id,
           order_date,
           order_created_at,
@@ -375,122 +404,58 @@ try {
           history_id,
           change_log_id
         )
-        VALUES (
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          false,
-          NULL,
-          $7
-        )
+        VALUES ($1, $2, $3, $4, $5, false, NULL, $6)
+        RETURNING order_id
       `,
       [
-        orderId,
         customerId,
         orderDate.toISOString().split("T")[0],
         "10:00:00",
         orderStatus,
         totalAmount,
-        randomUUID(),
+        await createChangeLog(customerUserId),
       ]
     );
+
+    const orderId: string = orderResult.rows[0].order_id;
 
     // Order item 1
     await client.query(
       `
         INSERT INTO "order_item" (
-          order_item_id,
           order_id,
           product_id,
           order_item_quantity,
           order_item_unit_price_at_time_of_order,
           order_item_line_total
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5)
       `,
-      [
-        randomUUID(),
-        orderId,
-        product1Id,
-        quantity1,
-        price1,
-        lineTotal1,
-      ]
+      [orderId, product1Id, quantity1, price1, lineTotal1]
     );
 
     // Order item 2
     await client.query(
       `
         INSERT INTO "order_item" (
-          order_item_id,
           order_id,
           product_id,
           order_item_quantity,
           order_item_unit_price_at_time_of_order,
           order_item_line_total
         )
-        VALUES ($1, $2, $3, $4, $5, $6)
+        VALUES ($1, $2, $3, $4, $5)
       `,
-      [
-        randomUUID(),
-        orderId,
-        product2Id,
-        quantity2,
-        price2,
-        lineTotal2,
-      ]
+      [orderId, product2Id, quantity2, price2, lineTotal2]
     );
   }
-
-  // --------------------------------------------------
-  // Create change-log records
-  // --------------------------------------------------
-
-  const users = await client.query(`
-    SELECT user_id
-    FROM "user"
-  `);
-
-  for (const user of users.rows) {
-    const changeLogId = randomUUID();
-
-    await client.query(
-      `
-        INSERT INTO "change_log" (
-          change_log_id,
-          user_id,
-          change_log_timestamp
-        )
-        VALUES ($1, $2, NOW())
-      `,
-      [changeLogId, user.user_id]
-    );
-
-    // Connect the user to its change log
-    await client.query(
-      `
-        UPDATE "user"
-        SET change_log_id = $1
-        WHERE user_id = $2
-      `,
-      [changeLogId, user.user_id]
-    );
-  }
-
-  // --------------------------------------------------
-  // Restore FK enforcement
-  // --------------------------------------------------
-
-  await client.query("SET session_replication_role = DEFAULT");
 
   await client.query("COMMIT");
 
   console.log("Seed completed successfully.");
   console.log("Created:");
-  console.log("- 2 staff users");
+  console.log("- 1 system user");
+  console.log("- 1 admin user, 1 staff user");
   console.log("- 10 customer users");
   console.log("- 10 customers");
   console.log("- 5 categories");

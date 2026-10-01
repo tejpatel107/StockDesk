@@ -98,6 +98,7 @@ export async function deleteCategoryService(req: Request) {
 
     return {
         statusCode: 204,
+        data: category
     };
 }
 

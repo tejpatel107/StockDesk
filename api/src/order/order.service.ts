@@ -76,7 +76,7 @@ export async function getOrderByIdForCustomerService(req: Request) {
     const { id: orderId } = req.params;
 
     try {
-        const { rows: orderItems } = (await getOrderByIdForCustomerDb(userId, orderId as string));
+        const { rows: orderItems } = await getOrderByIdForCustomerDb(userId, orderId as string);
 
         console.log(orderItems);
 
@@ -96,6 +96,9 @@ export async function getOrderByIdForCustomerService(req: Request) {
                 "order item id": oi.order_item_id,
                 "product id": oi.product_id,
                 "product name": oi.product_name,
+                "product unit price at time of order" : oi.order_item_unit_price_at_time_of_order,
+                "order item line total" : oi.order_item_line_total,
+                "order item quantity" : oi.order_item_quantity
             }))
         };
 
@@ -146,7 +149,7 @@ export async function createNewOrderService(req: Request) {
         await client.query('COMMIT');
 
         return {
-            statusCode: 204,
+            statusCode: 200,
             data: {
                 orderId: order.orderId
             }

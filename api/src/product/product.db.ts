@@ -175,7 +175,7 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
         await client.query('COMMIT');
 
         return {
-            deletedProductId: product.product_id,
+            "deleted product id": product.product_id,
             changeLogId
         };
 

@@ -94,6 +94,7 @@ export async function deleteSupplierService(req: Request) {
         supplier = await deleteSupplierDb(supplier, userId, changeLogId);
         return {
             statusCode: 204,
+            data: supplier
         };
     } catch (error) {
         return {

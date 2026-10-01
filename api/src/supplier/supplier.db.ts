@@ -120,7 +120,7 @@ export async function deleteSupplierDb(supplier: any, userId: string, changeLogI
         await client.query('COMMIT');
 
         return {
-            deletedSupplierId: supplier.supplier_id,
+            "deleted supplier id": supplier.supplier_id,
             changeLogId
         };
 

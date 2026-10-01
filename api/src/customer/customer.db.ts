@@ -49,16 +49,23 @@ export async function getCustomerByPhoneNumberOrEmailOrNameDb(value: string) {
     return (await pool.query(query, [`%${value}%`])).rows;
 }
 
-export async function addNewCustomerDb(customerId: string, userId: string, name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES) {
+export async function getCustomerByPhoneNumberDb(number: number) {
+    let query = `
+        SELECT 
+         c.customer_id,
+         c.customer_phone_number AS "phoneNumber"
+        FROM "customer" AS c 
+        WHERE (c.customer_phone_number = $1)
+            AND (c.history_id is NULL)
+            AND (c.flag_deleted = false)
+            `;
+    return await pool.query(query, [number]);
+}
 
-    const client = await pool.connect();
-    try {
+export async function addNewCustomerDb(client: PoolClient, name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES, changeLogId: string) {
 
-        await client.query('BEGIN');
-        await client.query('SET CONSTRAINTS ALL DEFERRED');
-
-        const { rows: [newUser] } = await client.query(
-            `INSERT INTO "user"
+    const { rows: [newUser] } = await client.query(
+        `INSERT INTO "user"
             (user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
             VALUES ($1, $2, $3, $4, $5, false, NULL)
             RETURNING
@@ -67,22 +74,11 @@ export async function addNewCustomerDb(customerId: string, userId: string, name:
                 user_email AS "userEmail",
                 user_role AS "userRole",
                 change_log_id AS "changeLogId";`,
-            [name, email, password, role, randomUUID()]
-        );
+        [name, email, password, role, changeLogId]
+    );
 
-        const { rows: [changeLog] } = await client.query(`
-            INSERT INTO change_log (
-                change_log_id,
-                user_id,
-                change_log_timestamp
-            ) VALUES ($1, $2, now())
-            RETURNING *           
-            `,
-            [newUser.changeLogId, newUser.userId]
-        );
-
-        const res = await client.query(
-            `INSERT INTO "customer"
+    const { rows: [customer] } = await client.query(
+        `INSERT INTO "customer"
             (customer_phone_number,
              customer_address,
              user_id,
@@ -91,19 +87,19 @@ export async function addNewCustomerDb(customerId: string, userId: string, name:
              change_log_id
             )
             VALUES ($1, $2, $3, false, NULL, $4)
-            `, [phoneNumber, address, newUser.userId, newUser.changeLogId]
-        );
+            RETURNING
+                customer_id AS "customerId",
+                customer_phone_number AS "customerPhoneNumber";`,
+        [phoneNumber, address, newUser.userId, changeLogId]
+    );
 
-        await client.query('COMMIT');
-        return res.rows[0];
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
+    return {
+        userId: newUser.userId,
+        customerId: customer.customerId,
+        userName: newUser.userName,
+        userEmail: newUser.userEmail,
+        customerPhoneNumber: customer.customerPhoneNumber
     }
-
 }
 
 export async function deleteCustomerDb(customer: any, userId: string, changeLogId: string) {
@@ -138,7 +134,7 @@ export async function deleteCustomerDb(customer: any, userId: string, changeLogI
         await client.query('COMMIT');
 
         return {
-            deletedCategoryId: customer.customer_id,
+            "deleted customer Id": customer.customer_id,
             changeLogId
         };
 

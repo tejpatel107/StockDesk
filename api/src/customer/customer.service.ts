@@ -177,6 +177,7 @@ export async function deleteCustomerService(req: Request) {
 
         return {
             statusCode: 204,
+            data: customer
         };
 
     } catch (error: any) {

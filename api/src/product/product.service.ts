@@ -160,17 +160,21 @@ export async function deleteProductService(req: Request) {
 
     try {
 
-        let product = await getProductByIdDb(id as string);
+        let { rows : [product] } = await getProductByIdDb(id as string);
 
         if (!product) {
             throw new Error("Product not found!");
         }
 
+        console.log(product);
+
         const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
+        
         product = await deleteProductDb(product, userId, changeLogId);
+
         return {
             statusCode: 204,
-            data: { productId: id, userId: userId }
+            data: product
         };
     } catch (error) {
         return {

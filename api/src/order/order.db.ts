@@ -118,6 +118,8 @@ export async function getOrderByIdForCustomerDb(userId: string, orderId: string)
         os.order_date,
         os.order_status,
         os.order_total_amount,
+        oi.order_item_unit_price_at_time_of_order,
+        oi.order_item_line_total,
         oi.order_item_quantity
       FROM "order_summary" os
       LEFT JOIN "order_item" oi ON os.order_id = oi.order_id
@@ -126,16 +128,17 @@ export async function getOrderByIdForCustomerDb(userId: string, orderId: string)
       SELECT
         ois.order_id,
         ois.customer_name,
+        ois.order_item_id,
+        p.product_id,
         ois.order_date,
         ois.order_status,
         ois.order_total_amount,
-        ois.order_item_id,
-        p.product_id,
         p.product_name,
-        ois.order_item_quantity
+        ois.order_item_unit_price_at_time_of_order,
+        ois.order_item_line_total,
+        ois.order_item_quantity       
       FROM "order_item_summary" ois  
-      LEFT JOIN "product" p ON ois.product_id = p.product_id 
-        AND (p.history_id IS NULL) AND (p.flag_deleted = false)
+      LEFT JOIN "product" p ON ois.product_id = p.product_id AND (p.history_id IS NULL) 
     )
     SELECT * FROM order_item_product_summary;
   `;

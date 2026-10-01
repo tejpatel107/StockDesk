@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS "product_supplier" (
 	PRIMARY KEY ("product_id", "supplier_id")
 );
 CREATE TABLE IF NOT EXISTS "change_log" (
-	"change_log_id" uuid,
+	"change_log_id" uuid DEFAULT gen_random_uuid(),
 	"user_id" uuid NOT NULL,
 	"change_log_timestamp" timestamp with time zone NOT NULL,
 	PRIMARY KEY ("change_log_id")
 );
-ALTER TABLE "user" ADD CONSTRAINT "user_fk7" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id") DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "user" ADD CONSTRAINT "user_fk7" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id");
 ALTER TABLE "category" ADD CONSTRAINT "category_fk5" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id");
 ALTER TABLE "product" ADD CONSTRAINT "product_fk5" FOREIGN KEY ("category_id") REFERENCES "category"("category_id");
 ALTER TABLE "product" ADD CONSTRAINT "product_fk8" FOREIGN KEY ("change_log_id") REFERENCES "change_log"("change_log_id");
@@ -97,6 +97,6 @@ ALTER TABLE "order_item" ADD CONSTRAINT "order_item_fk1" FOREIGN KEY ("order_id"
 ALTER TABLE "order_item" ADD CONSTRAINT "order_item_fk2" FOREIGN KEY ("product_id") REFERENCES "product"("product_id");
 ALTER TABLE "product_supplier" ADD CONSTRAINT "product_supplier_fk0" FOREIGN KEY ("product_id") REFERENCES "product"("product_id");
 ALTER TABLE "product_supplier" ADD CONSTRAINT "product_supplier_fk1" FOREIGN KEY ("supplier_id") REFERENCES "supplier"("supplier_id");
-ALTER TABLE "change_log" ADD CONSTRAINT "change_log_fk1" FOREIGN KEY ("user_id") REFERENCES "user"("user_id") ;
+ALTER TABLE "change_log" ADD CONSTRAINT "change_log_fk1" FOREIGN KEY ("user_id") REFERENCES "user"("user_id") DEFERRABLE INITIALLY DEFERRED;
 COMMENT ON TABLE "user" IS 'User records table';
 COMMENT ON TABLE "category" IS 'table for different categories of products';

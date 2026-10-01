@@ -2,13 +2,7 @@ import { randomUUID, type UUID } from "node:crypto";
 import { pool } from "../../../db/db.js";
 import type { ROLES } from "../../../db/roles.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
-
-interface UserRecord {
-    email: string,
-    password: string,
-    id: UUID,
-    role: ROLES
-}
+import type { PoolClient } from "pg";
 
 export async function getUserByEmailDb(email: string): Promise<UserRecord | undefined> {
     let query = `
@@ -30,19 +24,13 @@ export async function getUserByIdDb(userId: string) {
         SELECT * FROM "user" 
         WHERE user_id = $1 AND flag_deleted = false;
     `
-    return (await pool.query(query,[userId])).rows[0];
+    return (await pool.query(query, [userId])).rows[0];
 }
 
-export async function addNewUserDb(userId: string, name: string, email: string, password: string, role: ROLES): Promise<UserRecord | undefined> {
+export async function addNewUserDb(client: PoolClient, name: string, email: string, password: string, role: ROLES, changeLogId: string) {
 
-    const client = await pool.connect();
-    try {
-
-        await client.query('BEGIN');
-        await client.query('SET CONSTRAINTS ALL DEFERRED');
-
-        const { rows : [ user ] } = await client.query(
-            `INSERT INTO "user"
+    const { rows: [user] } = await client.query(
+        `INSERT INTO "user"
             (user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
             VALUES ($1, $2, $3, $4, $5, false, NULL)
             RETURNING
@@ -51,28 +39,8 @@ export async function addNewUserDb(userId: string, name: string, email: string, 
                 user_email AS "email",
                 user_role AS "userRole",
                 change_log_id AS "changeLogId";`,
-            [name, email, password, role, randomUUID()]
-        );
+        [name, email, password, role, changeLogId]
+    );
 
-        const { rows : [ changeLog ] } = await client.query(`
-            INSERT INTO change_log (
-                change_log_id,
-                user_id,
-                change_log_timestamp
-            ) VALUES ( $1, $2, now())
-            RETURNING *           
-            `,
-            [user.changeLogId, user.userId]
-        );
-
-        await client.query('COMMIT');
-        return user;
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-    } finally {
-        client.release();
-    }
-
+    return user;
 }
