@@ -3,9 +3,8 @@ import { addNewUserDb, getUserByEmailDb } from "./auth.db.js";
 import { hashPassword, verifyPassword } from "../../utilities/hash.js";
 import { generateJwtToken } from "../../utilities/token.js";
 import { ROLES } from "../../../db/roles.js";
-import { randomUUID } from "node:crypto";
 import { addNewCustomerDb, getCustomerByPhoneNumberDb } from "../customer/customer.db.js";
-import { AppError, ConflictError } from "../../utilities/globalErrorHandlers.js";
+import { AppError, AuthError, ConflictError, NotFoundError } from "../../utilities/globalErrorHandlers.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 import { SYSTEM_USER_ID } from "../../config/system.js";
 import { pool } from "../../../db/db.js";
@@ -17,23 +16,11 @@ export async function loginService(req: Request, res: Response) {
     const user = await getUserByEmailDb(email);
 
     if (!user) {
-        return {
-            statusCode: 403,
-            data: {
-                success: false,
-                error: `User for the email ${email} does not exists, enter correct email you used for signup`
-            }
-        }
+        throw new NotFoundError(`User for the email ${email} does not exists, enter correct email you used for signup`);
     }
 
     if (! await verifyPassword(password, user.password)) {
-        return {
-            statusCode: 403,
-            data: {
-                success: false,
-                error: "Password is wrong, please enter correct password"
-            }
-        };
+        throw new AuthError("Password is wrong, please enter correct password", 403);
     }
 
     const token = await generateJwtToken({ userId: user.id, role: user.role });
@@ -51,19 +38,20 @@ export async function loginService(req: Request, res: Response) {
             success: true,
             message: "logged in successfully!",
             jwt: token,
-            isStaff: user.role === ROLES.ADMIN || user.role === ROLES.STAFF 
+            isStaff: user.role === ROLES.ADMIN || user.role === ROLES.STAFF
         }
     }
 }
 
-export async function signupService(req: Request) {
+export async function signupStaffService(req: Request) {
 
-    const { firstName, lastName, email, password, phoneNumber, address, role } = req.body;
-    let user = await getUserByEmailDb(email);
+    const { firstName, lastName, email, password, role } = req.body;
 
-    if (role === ROLES.SYSTEM) {
-        throw new AppError(`User cannot have SYSTEM role, valid roles for user are 'ADMIN', 'STAFF', 'CUSTOMER'`);
+    if (role === ROLES.SYSTEM || role === ROLES.CUSTOMER) {
+        throw new AppError(`Staff user cannot have role ${role}, valid roles for staff users are 'ADMIN' and 'STAFF' only.`);
     }
+
+    let user = await getUserByEmailDb(email);
 
     if (user) {
         throw new ConflictError(`User with email ${email} already exists!`);
@@ -71,26 +59,62 @@ export async function signupService(req: Request) {
 
     const hashedPassword = await hashPassword(password);
 
-    const { rows: [changeLog] } = await insertNewChangeLogRecord(SYSTEM_USER_ID);
-
     const client = await pool.connect();
 
     try {
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(SYSTEM_USER_ID, client);
 
+        user = await addNewUserDb(client, (firstName as string).concat(" ", lastName as string), email, hashedPassword, role, changeLog.change_log_id);
+
+        return {
+            statusCode: 201,
+            data: {
+                success: true,
+                message: "user registered successfully!",
+                data: user
+            }
+        }
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw new AppError(error.message);
+    } finally {
+        client.release();
+
+    }
+
+}
+
+export async function singupCustomerService(req: Request) {
+
+    const { firstName, lastName, email, password, phoneNumber, address, role } = req.body;
+
+    if (role === ROLES.SYSTEM || role === ROLES.ADMIN || role === ROLES.STAFF) {
+        throw new AppError(`Invalid role ${role}, for customer. Customers can have only one role ${ROLES.CUSTOMER}.`);
+    }
+
+    let user = await getUserByEmailDb(email);
+
+    if (user) {
+        throw new ConflictError(`User with email ${email} already exists!`);
+    }
+
+    const { rows: [customer] } = await getCustomerByPhoneNumberDb(phoneNumber);
+
+    if (customer && customer.phoneNumber === phoneNumber)
+        throw new ConflictError(`Customer with existing phone number : ${phoneNumber} exists. Please try signing with another number`);
+
+    const hashedPassword = await hashPassword(password);
+    const fullName = `${firstName} ${lastName}`;
+    const client = await pool.connect();
+
+    try {
         await client.query('BEGIN');
 
-        if (role === ROLES.CUSTOMER) {
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(SYSTEM_USER_ID, client);
 
-            const { rows: [customer] } = await getCustomerByPhoneNumberDb(phoneNumber);
+        user = await addNewUserDb(client, fullName, email, hashedPassword, role, changeLog.change_log_id);
 
-            if (customer && customer.phoneNumber === phoneNumber)
-                throw new ConflictError(`Customer with existing phone number : ${phoneNumber} exists. Please try signing with another number`);
-
-            user = await addNewCustomerDb(client, (firstName as string).concat(" ", lastName as string), email, phoneNumber, address, hashedPassword, ROLES.CUSTOMER, changeLog.change_log_id);
-        }
-        else {
-            user = await addNewUserDb(client, (firstName as string).concat(" ", lastName as string), email, hashedPassword, role, changeLog.change_log_id);
-        }
+        user = await addNewCustomerDb(client, user, fullName, email, phoneNumber, address, hashedPassword, ROLES.CUSTOMER, changeLog.change_log_id);
 
         await client.query('COMMIT');
 
@@ -98,7 +122,7 @@ export async function signupService(req: Request) {
             statusCode: 201,
             data: {
                 success: true,
-                message: "user registered successfully!",
+                message: "customer registered successfully!",
                 data: user
             }
         }
@@ -110,4 +134,3 @@ export async function signupService(req: Request) {
         client.release();
     }
 }
-

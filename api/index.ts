@@ -50,14 +50,14 @@ const spec = {
 };
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(spec));
-
-app.use("/api", appRouter);
-app.use("/", pageRouter);
-app.get("api/health", async (req: Request, res: Response) => {
+app.get("/api/health", async (req: Request, res: Response) => {
     res.status(200).json({
         message: "Hello Client!"
     });
 });
+app.use("/api", appRouter);
+app.use("/", pageRouter);
+
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 

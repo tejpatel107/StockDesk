@@ -23,14 +23,17 @@ const roleSchema = z.preprocess(
     z.enum(ROLES)
 );
 
-export const signUpValidation = z.object({
+export const signUpStaffValidation = z.object({
     email: z.email(),
     firstName: personNameValidationSchema,
     lastName: personNameValidationSchema,
-    phoneNumber: z.e164(),
-    address: addressValidation.optional(),
     role: roleSchema,
     password: passwordValidation
+});
+
+export const signUpCustomerValidation = signUpStaffValidation.extend({
+    phoneNumber: z.e164(),
+    address : addressValidation.optional()
 });
 
 export const loginValidation = z.object({

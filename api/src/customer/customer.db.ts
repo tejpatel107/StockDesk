@@ -61,20 +61,7 @@ export async function getCustomerByPhoneNumberDb(number: number) {
     return await pool.query(query, [number]);
 }
 
-export async function addNewCustomerDb(client: PoolClient, name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES, changeLogId: string) {
-
-    const { rows: [newUser] } = await client.query(
-        `INSERT INTO "user"
-            (user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
-            VALUES ($1, $2, $3, $4, $5, false, NULL)
-            RETURNING
-                user_id AS "userId",
-                user_name AS "userName",
-                user_email AS "userEmail",
-                user_role AS "userRole",
-                change_log_id AS "changeLogId";`,
-        [name, email, password, role, changeLogId]
-    );
+export async function addNewCustomerDb(client: PoolClient, newUser: any ,name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES, changeLogId: string) {
 
     const { rows: [customer] } = await client.query(
         `INSERT INTO "customer"

@@ -13,7 +13,7 @@ export async function getUserByEmailDb(email: string): Promise<UserRecord | unde
                FROM "user" WHERE user_email = $1;`;
 
     try {
-        return (await pool.query<UserRecord>(query, [email])).rows[0];
+        return (await pool.query(query, [email])).rows[0];
     } catch (error) {
         throw error;
     }

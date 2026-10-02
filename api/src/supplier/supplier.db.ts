@@ -20,7 +20,7 @@ export async function getAllSuppliersDb() {
         SELECT * FROM "supplier"
         WHERE (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query)).rows;
+    return (await pool.query(query));
 }
 
 export async function getSupplierByIdDb(supplierId: string) {
@@ -28,15 +28,15 @@ export async function getSupplierByIdDb(supplierId: string) {
         SELECT * FROM "supplier"
         WHERE supplier_id = $1 AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [supplierId])).rows[0];
+    return (await pool.query(query, [supplierId]));
 }
 
 export async function getSuppliersByNameDb(value: string) {
     let query = `
         SELECT * FROM "supplier"
-        WHERE (supplier_name ILIKE $1) AND (history_id is NULL) AND (flag_deleted = false);
+        WHERE (supplier_name = $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [`%${value}%`])).rows;
+    return (await pool.query(query, [value]));
 }
 
 export async function getSuppliersByEmailOrPhoneNumberDb(value: string) {
@@ -47,16 +47,10 @@ export async function getSuppliersByEmailOrPhoneNumberDb(value: string) {
     return (await pool.query(query, [`%${value}%`])).rows;
 }
 
-export async function addNewSupplierDb(supplierId: string, name: string, email: string, phoneNumber: string, userId: string, changeLogId: string) {
+export async function addNewSupplierDb(client: PoolClient, name: string, email: string, phoneNumber: string, changeLogId: string) {
 
-    let client: PoolClient | undefined;
-
-    try {
-        client = await pool.connect();
-        await client.query('BEGIN');
-
-        const res = await client.query(
-            `INSERT INTO "supplier"
+    const { rows: [supplier] } = await client.query(
+        `INSERT INTO "supplier"
                 (supplier_name, 
                 supplier_email,
                 supplier_phone_number,
@@ -69,31 +63,15 @@ export async function addNewSupplierDb(supplierId: string, name: string, email: 
                     supplier_name AS "supplierName",
                     supplier_email AS "supplierEmail",
                     supplier_phone_number AS "supplierPhoneNumber";`,
-            [name, email, phoneNumber, changeLogId]
-        );
+        [name, email, phoneNumber, changeLogId]
+    );
 
-        await client.query('COMMIT');
-        return res.rows[0];
-
-    } catch (error) {
-        await client?.query('ROLLBACK');
-        throw error;
-    } finally {
-        client?.release();
-    }
-
+    return supplier;
 }
 
-export async function deleteSupplierDb(supplier: any, userId: string, changeLogId: string) {
+export async function deleteSupplierDb(client: PoolClient, supplier: any, changeLogId: string) {
 
-    let client: PoolClient | undefined;
-
-    try {
-        client = await pool.connect();
-
-        await client.query('BEGIN');
-
-        await client.query(`
+    await client.query(`
                     UPDATE supplier
                     SET
                         flag_deleted = true,
@@ -101,7 +79,7 @@ export async function deleteSupplierDb(supplier: any, userId: string, changeLogI
                     WHERE supplier_id = $2
                 `, [changeLogId, supplier.supplier_id]);
 
-        await client.query(`
+    await client.query(`
                 INSERT INTO supplier (
                     supplier_name,
                     supplier_email,
@@ -111,28 +89,19 @@ export async function deleteSupplierDb(supplier: any, userId: string, changeLogI
                     change_log_id
                 ) VALUES ( $1, $2, $3, false, $4, $5)
             `, [supplier.supplier_name,
-            supplier.supplier_email,
-            supplier.supplier_phone_number,
-            supplier.supplier_id,
-            supplier.change_log_id
-        ]);
+    supplier.supplier_email,
+    supplier.supplier_phone_number,
+    supplier.supplier_id,
+    supplier.change_log_id
+    ]);
 
-        await client.query('COMMIT');
-
-        return {
-            "deleted supplier id": supplier.supplier_id,
-            changeLogId
-        };
-
-    } catch (error) {
-        await client?.query('ROLLBACK');
-        throw error;
-    } finally {
-        client?.release();
-    }
+    return {
+        "deleted supplier id": supplier.supplier_id,
+        changeLogId
+    };
 }
 
-export async function updateSupplierDb(supplier: any, userId: string, updates: SupplierUpdate, changeLogId: string) {
+export async function updateSupplierDb(client: PoolClient, supplier: any, userId: string, updates: SupplierUpdate, changeLogId: string) {
 
     const keys = (Object.keys(updates)).filter((key): key is AllowedKeys => {
         return Object.hasOwn(allowedFields, key) && (updates[key as AllowedKeys] !== undefined || updates[key as AllowedKeys] !== null)
@@ -177,10 +146,10 @@ export async function updateSupplierDb(supplier: any, userId: string, updates: S
                     change_log_id
                 ) VALUES ( $1, $2, $3, false, $4, $5)
             `, [supplier.supplier_name,
-            supplier.supplier_email,
-            supplier.supplier_phone_number,
-            supplier.supplier_id,
-            supplier.change_log_id
+        supplier.supplier_email,
+        supplier.supplier_phone_number,
+        supplier.supplier_id,
+        supplier.change_log_id
         ]);
 
         await client.query("COMMIT");
