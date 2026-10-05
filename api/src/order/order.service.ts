@@ -1,10 +1,11 @@
 import type { Request } from "express";
-import { AppError, ValidationError } from "../../utilities/globalErrorHandlers.js";
-import { getOrdersQuerySchema, ORDER_STATUSES } from "../../validators/order.validation.js";
-import { addOrderItems, changeOrderStatusDb, createNewOrderDb, getOrderByIdDb, getOrderByIdForCustomerDb, getOrderByIdForStaffDb, getOrdersDb, getProductsDb, updateProductQuantityDb } from "./order.db.js";
+import { AppError, NotFoundError, ValidationError } from "../../utilities/globalErrorHandlers.js";
+import { ordersQuerySchema, ORDER_STATUSES } from "../../validators/order.validation.js";
+import { addOrderItemsDb, changeOrderStatusDb, createNewOrderDb, getOrderByIdDb, getOrderByIdForCustomerDb, getOrderByIdForStaffDb, getOrdersDb, getProductsDb, updateProductQuantityDb } from "./order.db.js";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
+import { ROLES } from "../../../db/roles.js";
 
 export interface OrderDTO {
     orderDate: string;
@@ -26,7 +27,7 @@ export interface PaginatedOrders {
 
 export async function getOrdersService(req: Request): Promise<PaginatedOrders | any> {
 
-    const parsed = getOrdersQuerySchema.safeParse(req.query);
+    const parsed = ordersQuerySchema.safeParse(req.query);
 
     if (!parsed.success) {
         throw new ValidationError(
@@ -70,86 +71,50 @@ export async function getOrdersService(req: Request): Promise<PaginatedOrders | 
     }
 }
 
-export async function getOrderByIdForStaffService(req: Request) {
-    
+export async function getOrderByIdService(req: Request) {
+
     const { id: orderId } = req.params;
-
-    try {
-        const { rows: orderItems } = await getOrderByIdForStaffDb(orderId as string);
-
-        console.log(orderItems);
-
-        if (orderItems.length === 0) {
-            throw new AppError(`No order found for id: ${orderId}`);
-        }
-
-        const { order_id, customer_name, order_status, order_date, order_total_amount } = orderItems[0];
-
-        const order = {
-            "order id": order_id,
-            "customer name": customer_name,
-            "order status": order_status,
-            "order date": order_date,
-            "order total amount": order_total_amount,
-            "order items": orderItems.map(oi => ({
-                "order item id": oi.order_item_id,
-                "product id": oi.product_id,
-                "product name": oi.product_name,
-                "product unit price at time of order": oi.order_item_unit_price_at_time_of_order,
-                "order item line total": oi.order_item_line_total,
-                "order item quantity": oi.order_item_quantity
-            }))
-        };
-
-        return {
-            statusCode: 200,
-            data: order
-        }
-    } catch (error) {
-        throw new AppError((error as AppError).message)
-    }
-}
-
-export async function getOrderByIdForCustomerService(req: Request) {
-
     const userId = req.user?.userId;
-    const { id: orderId } = req.params;
+    const role = req.user?.role;
 
-    try {
-        const { rows: orderItems } = await getOrderByIdForCustomerDb(userId, orderId as string);
+    let orderItems = [];
 
-        console.log(orderItems);
-
-        if (orderItems.length === 0) {
-            throw new AppError(`No order found for id: ${orderId}`);
-        }
-
-        const { order_id, customer_name, order_status, order_date, order_total_amount } = orderItems[0];
-
-        const order = {
-            "order id": order_id,
-            "customer name": customer_name,
-            "order status": order_status,
-            "order date": order_date,
-            "order total amount": order_total_amount,
-            "order items": orderItems.map(oi => ({
-                "order item id": oi.order_item_id,
-                "product id": oi.product_id,
-                "product name": oi.product_name,
-                "product unit price at time of order": oi.order_item_unit_price_at_time_of_order,
-                "order item line total": oi.order_item_line_total,
-                "order item quantity": oi.order_item_quantity
-            }))
-        };
-
-        return {
-            statusCode: 200,
-            data: order
-        }
-    } catch (error) {
-        throw new AppError((error as AppError).message)
+    if (role === ROLES.CUSTOMER) {
+        const { rows } = await getOrderByIdForCustomerDb(userId, orderId as string);
+        orderItems = rows;
+    } else {
+        const { rows } = await getOrderByIdForStaffDb(orderId as string);
+        orderItems = rows;
     }
 
+    console.log(orderItems);
+
+    if (orderItems.length === 0) {
+        throw new NotFoundError(`No order found for id: ${orderId}`);
+    }
+
+    const { order_id, customer_name, order_status, order_date, order_total_amount } = orderItems[0];
+
+    const order = {
+        "order id": order_id,
+        "customer name": customer_name,
+        "order status": order_status,
+        "order date": order_date,
+        "order total amount": order_total_amount,
+        "order items": orderItems.map(oi => ({
+            "order item id": oi.order_item_id,
+            "product id": oi.product_id,
+            "product name": oi.product_name,
+            "product unit price at time of order": oi.order_item_unit_price_at_time_of_order,
+            "order item line total": oi.order_item_line_total,
+            "order item quantity": oi.order_item_quantity
+        }))
+    };
+
+    return {
+        statusCode: 200,
+        data: order
+    }
 }
 
 export async function createNewOrderService(req: Request) {
@@ -170,11 +135,11 @@ export async function createNewOrderService(req: Request) {
 
         await areProductsInStock(products, itemsMap);
 
-        const lineTotals = await calculateLineTotalForProducts(products, itemsMap);
+        const lineTotals = calculateLineTotalForProducts(products, itemsMap);
 
         const orderTotal = lineTotals.reduce((sum, total) => sum + total, 0);
 
-        const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
         const updateProductQuantities = new Map(
             products.map(product => [product.product_id, product.product_quantity - itemsMap.get(product.product_id)])
@@ -182,14 +147,14 @@ export async function createNewOrderService(req: Request) {
 
         const { rows: [order] } = await createNewOrderDb(client, customerId, ORDER_STATUSES.PENDING, orderTotal, changeLog.change_log_id);
 
-        await addOrderItems(client, order.orderId, products, itemsMap, lineTotals);
+        await addOrderItemsDb(client, order.orderId, products, itemsMap, lineTotals);
 
         await updateProductQuantityDb(client, changeLog.change_log_id, products, updateProductQuantities);
 
         await client.query('COMMIT');
 
         return {
-            statusCode: 200,
+            statusCode: 201,
             data: {
                 orderId: order.orderId
             }
@@ -212,14 +177,14 @@ async function getDesiredProducts(client: PoolClient, reqeuestedProductIds: stri
     const ids = reqeuestedProductIds.filter(id => !foundProductIds.has(id));
 
     if (ids.length > 0) {
-        throw new Error(`Products does not exist for : ${Array.from(ids).join(", ")}`)
+        throw new NotFoundError(`Product does not exist for : ${Array.from(ids).join(", ")}`)
     }
 
     return products;
 
 }
 
-async function calculateLineTotalForProducts(products: any[], items: Map<any, any>) {
+function calculateLineTotalForProducts(products: any[], items: Map<any, any>) {
     ``
     return products.map((product) =>
         product.product_price * items.get(product.product_id)
@@ -235,7 +200,7 @@ async function areProductsInStock(products: any[], items: Map<string, number>) {
 
     if (flagedProducts.length > 0) {
         const ids = flagedProducts.map(flaged_product => flaged_product.product_id);
-        throw new Error(`Not enough stock for products: ${ids.join(", ")}`);
+        throw new AppError(`Not enough stock for products: ${ids.join(", ")}`);
     }
 
 }
@@ -278,16 +243,14 @@ export async function updateOrderService(req: Request) {
         throw new AppError(`Invalid transition of status. Pending orders can only be transitioned to ${ORDER_STATUSES.CANCELLED} or ${ORDER_STATUSES.CONFIRMED} status.`);
     }
 
-    const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
-
     const client = await pool.connect();
 
     try {
         await client.query('BEGIN');
 
-        const { rows: [updatedOrder] } = await changeOrderStatusDb(client, orderId as string, changeLog.change_log_id, status);
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        console.log(updatedOrder);
+        const { rows: [updatedOrder] } = await changeOrderStatusDb(client, orderId as string, changeLog.change_log_id, status);
 
         if (status === ORDER_STATUSES.CANCELLED) {
 
@@ -304,18 +267,12 @@ export async function updateOrderService(req: Request) {
 
             await updateProductQuantityDb(client, changeLog.change_log_id, products, updatedOrderProductQuantities);
 
-            await client.query('COMMIT');
-
-            return {
-                statusCode: 200,
-                data: updatedOrder
-            }
         }
 
         await client.query('COMMIT');
 
         return {
-            statusCode: 200,
+            statusCode: 204,
             data: updatedOrder
         }
     } catch (error) {

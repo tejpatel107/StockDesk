@@ -1,5 +1,5 @@
 import z from "zod";
-import { AT_LEAST_ONE_FIELD, atLeastOneField, moneyValidationSchema, paramIdValidationSchema } from "./common.validation.js";
+import { AT_LEAST_ONE_FIELD, atLeastOneField, moneyValidationSchema, paginationQueryValidationSchema, paramIdValidationSchema } from "./common.validation.js";
 
 const PG_INT_MAX = 2_147_483_647;
 
@@ -24,4 +24,21 @@ export const csvRowValidationSchema = z.object({
     price: z.string().trim().regex(/^\d{1,10}$/, "price must be a whole number (max 10 digits)"),
     quantity: z.string().trim().regex(/^\d{1,9}$/, "quantity must be a non-negative integer"),
     category_id: z.string().trim().uuid("category_id must be a valid UUID"),
+});
+
+export const productSearchQueryValidationSchema = paginationQueryValidationSchema.extend({
+    search : z.string()
+});
+
+export const productCategoryQueryValidationSchema = paginationQueryValidationSchema.extend({
+    categoryId : z.uuid()
+});
+
+export const productPriceRangeQueryValidationSchema = paginationQueryValidationSchema.extend({
+    minPrice : moneyValidationSchema.optional(),
+    maxPrice : moneyValidationSchema.optional()
+});
+
+export const productStockQueryValidationSchema = paginationQueryValidationSchema.extend({
+    inStock : z.string()
 });

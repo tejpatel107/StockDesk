@@ -18,7 +18,7 @@ export async function getProductsController(req: Request, res: Response) {
 }
 
 async function getAllProducts(req: Request, res: Response) {
-    const result = await getAllProductsService();
+    const result = await getAllProductsService(req);
     return res.status(result?.statusCode as number).json(result?.data);
 };
 

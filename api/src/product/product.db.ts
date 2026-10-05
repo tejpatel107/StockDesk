@@ -3,12 +3,15 @@ import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import type { ValidRow } from "./product.service.js";
 
-export async function getAllProductsDb() {
-    let query = `
-        SELECT * FROM "product"
-        WHERE (history_id is NULL) AND (flag_deleted = false);
+export async function getAllProductsDb(pageSize: number, offset: number) {
+    const query = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM "product"
+        WHERE (history_id IS NULL) AND (flag_deleted = false)
+        ORDER BY product_name, product_id
+        LIMIT $1 OFFSET $2;
     `;
-    return (await pool.query(query));
+    return await pool.query(query, [pageSize, offset]);
 }
 
 export async function getProductByIdDb(productId: string) {
@@ -21,16 +24,20 @@ export async function getProductByIdDb(productId: string) {
     return (await pool.query(query, [productId]));
 }
 
-export async function getProductsByNameOrSkuDb(value: string) {
-    let query = `
-        SELECT * FROM "product"
-        WHERE (product_name ILIKE $1 OR product_sku ILIKE $1) AND (history_id is NULL) AND (flag_deleted = false);
+export async function getProductsByNameOrSkuDb(value: string, pageSize: number, offset: number) {
+    const query = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM "product"
+        WHERE (product_name ILIKE $1 OR product_sku ILIKE $1)
+          AND (history_id IS NULL) AND (flag_deleted = false)
+        ORDER BY product_name, product_id
+        LIMIT $2 OFFSET $3;
     `;
-    return (await pool.query(query, [`%${value}%`]));
+    return await pool.query(query, [`%${value}%`, pageSize, offset]);
 }
 
 export async function getProductByNameDb(value: string) {
-    let query = `
+    const query = `
         SELECT * FROM "product"
         WHERE (product_name = $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
@@ -38,43 +45,56 @@ export async function getProductByNameDb(value: string) {
 }
 
 export async function getProductBySkuDb(value: string) {
-    let query = `
+    const query = `
         SELECT * FROM "product"
         WHERE (product_sku = $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
     return (await pool.query(query, [value]));
 }
 
-export async function getProductsByCategoryIdDb(id: string) {
-    let query = `
-        SELECT * FROM "product"
-        WHERE category_id = $1 AND (history_id is NULL) AND (flag_deleted = false);
+export async function getProductsByCategoryIdDb(id: string, pageSize: number, offset: number) {
+    const query = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM "product"
+        WHERE category_id = $1 AND (history_id IS NULL) AND (flag_deleted = false)
+        ORDER BY product_name, product_id
+        LIMIT $2 OFFSET $3;
     `;
-    return (await pool.query(query, [id]));
+    return await pool.query(query, [id, pageSize, offset]);
 }
 
-export async function getProductsWithinPriceRangeDb(minPrice: number, maxPrice: number) {
-    let query = `
-        SELECT * FROM "product"
-        WHERE ($1 <= product_price AND product_price <= $2) AND (history_id is NULL) AND (flag_deleted = false);
+export async function getProductsWithinPriceRangeDb(pageSize: number, offset: number, minPrice: number = 0, maxPrice: number = Infinity) {
+    const query = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM "product"
+        WHERE ($1 <= product_price AND product_price <= $2)
+          AND (history_id IS NULL) AND (flag_deleted = false)
+        ORDER BY product_price, product_id
+        LIMIT $3 OFFSET $4;
     `;
-    return (await pool.query(query, [minPrice, maxPrice]));
+    return await pool.query(query, [minPrice, maxPrice, pageSize, offset]);
 }
 
-export async function getProductsWithinStockDb() {
-    let query = `
-        SELECT * FROM "product"
-        WHERE (history_id is NULL) AND (flag_deleted = false) AND product_stock_quantity > 0;
+export async function getProductsWithinStockDb(pageSize: number, offset: number) {
+    const query = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM "product"
+        WHERE (history_id IS NULL) AND (flag_deleted = false) AND product_stock_quantity > 0
+        ORDER BY product_name, product_id
+        LIMIT $1 OFFSET $2;
     `;
-    return (await pool.query(query));
+    return await pool.query(query, [pageSize, offset]);
 }
 
-export async function getProductsOutOfStockDb() {
-    let query = `
-        SELECT * FROM "product"
-        WHERE (history_id is NULL) AND (flag_deleted = false) AND product_stock_quantity = 0;
+export async function getProductsOutOfStockDb(pageSize: number, offset: number) {
+    const query = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM "product"
+        WHERE (history_id IS NULL) AND (flag_deleted = false) AND product_stock_quantity = 0
+        ORDER BY product_name, product_id
+        LIMIT $1 OFFSET $2;
     `;
-    return (await pool.query(query));
+    return await pool.query(query, [pageSize, offset]);
 }
 
 export async function addNewProductDb(name: string, sku: string, price: number, quantity: number, category_id: string, changeLogId: string) {

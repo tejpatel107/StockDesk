@@ -216,7 +216,7 @@ export async function createNewOrderDb(
 
 }
 
-export async function addOrderItems(
+export async function addOrderItemsDb(
   client: PoolClient,
   orderId: string,
   products: any[],

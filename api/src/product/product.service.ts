@@ -2,9 +2,10 @@ import type { Request } from "express";
 import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb, getProductByNameDb, getProductBySkuDb } from "./product.db.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 import { AppError, ConflictError, NotFoundError } from "../../utilities/globalErrorHandlers.js";
-import { csvRowValidationSchema } from "../../validators/productValidation.js";
+import { csvRowValidationSchema, productCategoryQueryValidationSchema, productPriceRangeQueryValidationSchema, productSearchQueryValidationSchema, productStockQueryValidationSchema } from "../../validators/productValidation.js";
 import { pool } from "../../../db/db.js";
 import { parse } from "csv-parse/sync";
+import { paginationQueryValidationSchema } from "../../validators/common.validation.js";
 
 const MAX_ROWS = 5000;
 const REQUIRED_COLUMNS = ["name", "sku", "price", "quantity", "category_id"] as const;
@@ -29,50 +30,58 @@ const allowedFields = {
 
 type AllowedKeys = keyof typeof allowedFields;
 
-export async function getAllProductsService() {
-    const { rows: products } = await getAllProductsDb();
+function getOffset(page: number, pageSize: number) {
+    return (page - 1) * pageSize;
+}
+
+function paginate(rows: any[], page: number, pageSize: number) {
+    const total = rows.length ? Number(rows[0].total_count) : 0;
+    const products = rows.map(({ total_count, ...product }) => product);
     return {
         statusCode: 200,
-        data: { count: products.length, products }
+        data: {
+            count: products.length,
+            total,
+            page,
+            pageSize,
+            totalPages: Math.ceil(total / pageSize),
+            products,
+        },
     };
 }
 
+export async function getAllProductsService(req: Request) {
+    const { page, pageSize } = paginationQueryValidationSchema.parse(req.query);
+    const { rows } = await getAllProductsDb(pageSize, getOffset(page, pageSize));
+    return paginate(rows, page, pageSize);
+}
 
 export async function getProductsByNameOrSkuService(req: Request) {
-    const { search } = req.query;
-    const { rows: products } = await getProductsByNameOrSkuDb(search as string);
-    return {
-        statusCode: 200,
-        data: { count: products.length, products }
-    };
+    const { search, page, pageSize } = productSearchQueryValidationSchema.parse(req.query);
+    const { rows } = await getProductsByNameOrSkuDb(search, pageSize, getOffset(page, pageSize));
+    return paginate(rows, page, pageSize);
 }
 
 export async function getProductsByCategoryIdService(req: Request) {
-    const { categoryId } = req.query;
-    const { rows: products } = await getProductsByCategoryIdDb(categoryId as string);
-    return {
-        statusCode: 200,
-        data: { count: products.length, products }
-    };
+    const { categoryId, page, pageSize } = productCategoryQueryValidationSchema.parse(req.query);
+    const { rows } = await getProductsByCategoryIdDb(categoryId, pageSize, getOffset(page, pageSize));
+    return paginate(rows, page, pageSize);
 }
 
 export async function getProductsWithinPriceRangeService(req: Request) {
-    const { minPrice, maxPrice } = req.query;
-
-    const { rows: products } = await getProductsWithinPriceRangeDb(Number(minPrice), Number(maxPrice));
-    return {
-        statusCode: 200,
-        data: { count: products.length, products }
-    };
+    const { minPrice, maxPrice, page, pageSize } = productPriceRangeQueryValidationSchema.parse(req.query);
+    const { rows } = await getProductsWithinPriceRangeDb(pageSize, getOffset(page, pageSize), minPrice, maxPrice);
+    return paginate(rows, page, pageSize);
 }
 
 export async function getProductsWithinStockService(req: Request) {
-    const inStock = req.query.inStock === "true";
-    const { rows: products } = inStock ? await getProductsWithinStockDb() : await getProductsOutOfStockDb();
-    return {
-        statusCode: 200,
-        data: { count: products.length, products }
-    };
+    const { inStock, page, pageSize } = productStockQueryValidationSchema.parse(req.query);
+    const offset = getOffset(page, pageSize);
+    const { rows } =
+        inStock === "true"
+            ? await getProductsWithinStockDb(pageSize, offset)
+            : await getProductsOutOfStockDb(pageSize, offset);
+    return paginate(rows, page, pageSize);
 }
 
 export async function getProductByIdService(req: Request) {
@@ -110,7 +119,7 @@ export async function addNewProductService(req: Request) {
     }
 
     const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
-    const { rows : [newProduct]}  = await addNewProductDb(name, sku, price, quantity, categoryId, changeLog.change_log_id);
+    const { rows: [newProduct] } = await addNewProductDb(name, sku, price, quantity, categoryId, changeLog.change_log_id);
 
     return {
         statusCode: 201,
@@ -201,8 +210,8 @@ export async function updateProductService(req: Request) {
         await client.query('BEGIN');
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
-        
-        product = await updateProductDb(client, product, setClause, values.toSpliced(0,0, changeLog.change_log_id), changeLog.change_log_id);
+
+        product = await updateProductDb(client, product, setClause, values.toSpliced(0, 0, changeLog.change_log_id), changeLog.change_log_id);
 
         await client.query('COMMIT');
 

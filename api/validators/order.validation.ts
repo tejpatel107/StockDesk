@@ -11,7 +11,7 @@ export enum ORDER_STATUSES {
     CANCELLED = "CANCELLED"
 }
 
-export const getOrdersQuerySchema = z
+export const ordersQuerySchema = z
     .object({
         status: z.enum(ORDER_STATUSES).optional(),
         startDate: z.iso.date().optional(),
@@ -41,4 +41,4 @@ export const updateOrderValidationSchema = z.object({
     status: z.enum(ORDER_STATUSES)
 });
 
-export type OrderSchema = z.infer<typeof getOrdersQuerySchema>;
+export type OrderSchema = z.infer<typeof ordersQuerySchema>;
