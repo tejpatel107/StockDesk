@@ -3,29 +3,12 @@ import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import type { ValidRow } from "./product.service.js";
 
-const allowedFields = {
-    name: "product_name",
-    price: "product_price",
-    quantity: "product_stock_quantity",
-    sku: "product_sku",
-    category_id: "category_id"
-} as const;
-
-type AllowedKeys = keyof typeof allowedFields;
-type ProductUpdate = Partial<{
-    name: string;
-    price: number;
-    quantity: number;
-    sku: string,
-    category_id: string
-}>
-
 export async function getAllProductsDb() {
     let query = `
         SELECT * FROM "product"
         WHERE (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query)).rows;
+    return (await pool.query(query));
 }
 
 export async function getProductByIdDb(productId: string) {
@@ -43,23 +26,23 @@ export async function getProductsByNameOrSkuDb(value: string) {
         SELECT * FROM "product"
         WHERE (product_name ILIKE $1 OR product_sku ILIKE $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [`%${value}%`])).rows;
+    return (await pool.query(query, [`%${value}%`]));
 }
 
-export async function getProductsByNameDb(value: type) {
+export async function getProductByNameDb(value: string) {
     let query = `
         SELECT * FROM "product"
         WHERE (product_name = $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [`%${value}%`]));
+    return (await pool.query(query, [value]));
 }
 
-export async function getProductsBySkuDb(value: type) {
+export async function getProductBySkuDb(value: string) {
     let query = `
         SELECT * FROM "product"
-        WHERE (product_name = $1) AND (history_id is NULL) AND (flag_deleted = false);
+        WHERE (product_sku = $1) AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [`%${value}%`]));
+    return (await pool.query(query, [value]));
 }
 
 export async function getProductsByCategoryIdDb(id: string) {
@@ -67,7 +50,7 @@ export async function getProductsByCategoryIdDb(id: string) {
         SELECT * FROM "product"
         WHERE category_id = $1 AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [id])).rows;
+    return (await pool.query(query, [id]));
 }
 
 export async function getProductsWithinPriceRangeDb(minPrice: number, maxPrice: number) {
@@ -75,7 +58,7 @@ export async function getProductsWithinPriceRangeDb(minPrice: number, maxPrice: 
         SELECT * FROM "product"
         WHERE ($1 <= product_price AND product_price <= $2) AND (history_id is NULL) AND (flag_deleted = false);
     `;
-    return (await pool.query(query, [minPrice, maxPrice])).rows;
+    return (await pool.query(query, [minPrice, maxPrice]));
 }
 
 export async function getProductsWithinStockDb() {
@@ -83,7 +66,7 @@ export async function getProductsWithinStockDb() {
         SELECT * FROM "product"
         WHERE (history_id is NULL) AND (flag_deleted = false) AND product_stock_quantity > 0;
     `;
-    return (await pool.query(query)).rows;
+    return (await pool.query(query));
 }
 
 export async function getProductsOutOfStockDb() {
@@ -91,20 +74,13 @@ export async function getProductsOutOfStockDb() {
         SELECT * FROM "product"
         WHERE (history_id is NULL) AND (flag_deleted = false) AND product_stock_quantity = 0;
     `;
-    return (await pool.query(query)).rows;
+    return (await pool.query(query));
 }
 
-export async function addNewProductDb(productId: string, name: string, sku: string, price: number, quantity: number, category_id: string, userId: string, changeLogId: string): Promise<ProductRecord> {
+export async function addNewProductDb(name: string, sku: string, price: number, quantity: number, category_id: string, changeLogId: string) {
 
-    let client: PoolClient | undefined;
-
-    try {
-        client = await pool.connect();
-        await client.query('BEGIN');
-        await client.query('SET CONSTRAINTS ALL DEFERRED');
-
-        const res = await client.query<ProductRecord>(
-            `INSERT INTO "product"
+    return await pool.query(
+        `INSERT INTO "product"
                 (product_name, 
                 product_sku, 
                 product_price, 
@@ -120,31 +96,13 @@ export async function addNewProductDb(productId: string, name: string, sku: stri
                     product_sku AS "productSku",
                     product_price AS "productPrice",
                     product_stock_quantity AS "productQuantity";`,
-            [name, sku, price, quantity, category_id, changeLogId]
-        );
-
-        await client.query('COMMIT');
-        return res.rows[0];
-
-    } catch (error) {
-        await client?.query('ROLLBACK');
-        throw error;
-    } finally {
-        client?.release();
-    }
-
+        [name, sku, price, quantity, category_id, changeLogId]
+    );
 }
 
-export async function deleteProductDb(product: any, userId: string, changeLogId: string) {
+export async function deleteProductDb(client: PoolClient, product: any, changeLogId: string) {
 
-    let client: PoolClient | undefined;
-
-    try {
-        client = await pool.connect();
-
-        await client.query('BEGIN');
-
-        await client.query(`
+    await client.query(`
                     UPDATE product
                     SET
                         flag_deleted = true,
@@ -152,7 +110,7 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                     WHERE product_id = $2
                 `, [changeLogId, product.product_id]);
 
-        await client.query(`
+    await client.query(`
                 INSERT INTO product (
                     product_name,
                     product_sku,
@@ -164,63 +122,33 @@ export async function deleteProductDb(product: any, userId: string, changeLogId:
                     change_log_id
                 ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
             `, [product.product_name,
-        product.product_sku,
-        product.product_price,
-        product.product_stock_quantity,
-        product.category_id,
-        product.product_id,
-        product.change_log_id
-        ]);
+    product.product_sku,
+    product.product_price,
+    product.product_stock_quantity,
+    product.category_id,
+    product.product_id,
+    product.change_log_id
+    ]);
 
-        await client.query('COMMIT');
-
-        return {
-            "deleted product id": product.product_id,
-            changeLogId
-        };
-
-    } catch (error) {
-        await client?.query('ROLLBACK');
-        throw error;
-    } finally {
-        client?.release();
-    }
+    return {
+        "deleted product id": product.product_id,
+        changeLogId
+    };
 }
 
-export async function updateProductDb(product: any, userId: string, updates: ProductUpdate, changeLogId: string) {
+export async function updateProductDb(client: PoolClient, product: any, setClause: string, values: string[], changeLogId: string) {
 
-    const keys = (Object.keys(updates)).filter((key): key is AllowedKeys => {
-        return Object.hasOwn(allowedFields, key) && (updates[key as AllowedKeys] !== undefined || updates[key as AllowedKeys] !== null)
-    });
-
-    if (keys.length === 0) {
-        throw new Error("No valid fields provided for update");
-    }
-
-    const values = [changeLogId, ...keys.map((k) => updates[k]), product.product_id];
-
-    const setClause = [
-        "change_log_id = $1",
-        ...keys.map((k, i) => `${allowedFields[k]} = $${i + 2}`),
-    ].join(", ");
-
-    let client: PoolClient | undefined;
-
-    try {
-        client = await pool.connect();
-
-
-        const {
-            rows: [updatedProduct],
-        } = await client.query(
-            `UPDATE product
+    const {
+        rows: [updatedProduct],
+    } = await client.query(
+        `UPDATE product
              SET ${setClause}
              WHERE product_id = $${values.length}
              RETURNING *`,
-            values
-        );
+        values
+    );
 
-        await client.query(`
+    await client.query(`
                 INSERT INTO product (
                     product_name,
                     product_sku,
@@ -232,27 +160,18 @@ export async function updateProductDb(product: any, userId: string, updates: Pro
                     change_log_id
                 ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
             `, [product.product_name,
-        product.product_sku,
-        product.product_price,
-        product.product_stock_quantity,
-        product.category_id,
-        product.product_id,
-        product.change_log_id
-        ]);
+    product.product_sku,
+    product.product_price,
+    product.product_stock_quantity,
+    product.category_id,
+    product.product_id,
+    product.change_log_id
+    ]);
 
-        await client.query("COMMIT");
-
-        return {
-            product: updatedProduct,
-            changeLogId,
-        };
-
-    } catch (error) {
-        await client?.query("ROLLBACK");
-        throw error;
-    } finally {
-        client?.release();
-    }
+    return {
+        product: updatedProduct,
+        changeLogId,
+    };
 }
 
 export async function getProductsBySkuIfExistDb(client: PoolClient, skus: string[]) {

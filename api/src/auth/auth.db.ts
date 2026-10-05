@@ -29,7 +29,7 @@ export async function getUserByIdDb(userId: string) {
 
 export async function addNewUserDb(client: PoolClient, name: string, email: string, password: string, role: ROLES, changeLogId: string) {
 
-    const { rows: [user] } = await client.query(
+    return await client.query(
         `INSERT INTO "user"
             (user_name, user_email, user_password, user_role, change_log_id, flag_deleted, history_id)
             VALUES ($1, $2, $3, $4, $5, false, NULL)
@@ -41,6 +41,4 @@ export async function addNewUserDb(client: PoolClient, name: string, email: stri
                 change_log_id AS "changeLogId";`,
         [name, email, password, role, changeLogId]
     );
-
-    return user;
 }

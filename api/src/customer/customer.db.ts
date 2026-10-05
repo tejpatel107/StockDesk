@@ -1,4 +1,3 @@
-import { randomUUID, type UUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import type { ROLES } from "../../../db/roles.js";
@@ -12,14 +11,11 @@ export async function getAllCustomersDb() {
          c.customer_phone_number,
          c.customer_address
         FROM "customer" AS c 
-        LEFT JOIN "user" AS u 
-        ON c.user_id = u.user_id 
-        WHERE (c.history_id is NULL) 
-            AND (c.flag_deleted = false) 
-            AND (u.history_id is NULL) 
-            AND (u.flag_deleted = false) 
-    `;
-    return (await pool.query(query)).rows;
+        LEFT JOIN "user" AS u  
+        ON c.user_id = u.user_id AND (u.history_id is NULL) AND (u.flag_deleted = false)
+        WHERE (c.history_id is NULL) AND (c.flag_deleted = false);`;
+
+    return (await pool.query(query));
 }
 
 export async function getCustomerByIdDb(customerId: string) {
@@ -27,7 +23,7 @@ export async function getCustomerByIdDb(customerId: string) {
         SELECT * FROM "customer"
         WHERE customer_id = $1 AND (flag_deleted = false) AND (history_id is NULL);
     `;
-    return (await pool.query(query, [customerId])).rows[0];
+    return (await pool.query(query, [customerId]));
 }
 
 export async function getCustomerByPhoneNumberOrEmailOrNameDb(value: string) {
@@ -46,7 +42,7 @@ export async function getCustomerByPhoneNumberOrEmailOrNameDb(value: string) {
             AND (c.history_id is NULL)
             AND (c.flag_deleted = false)
             `;
-    return (await pool.query(query, [`%${value}%`])).rows;
+    return (await pool.query(query, [`%${value}%`]));
 }
 
 export async function getCustomerByPhoneNumberDb(number: number) {
@@ -61,7 +57,7 @@ export async function getCustomerByPhoneNumberDb(number: number) {
     return await pool.query(query, [number]);
 }
 
-export async function addNewCustomerDb(client: PoolClient, newUser: any ,name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES, changeLogId: string) {
+export async function addNewCustomerDb(client: PoolClient, newUser: any, name: string, email: string, phoneNumber: string, address: string, password: string, role: ROLES, changeLogId: string) {
 
     const { rows: [customer] } = await client.query(
         `INSERT INTO "customer"
@@ -88,16 +84,9 @@ export async function addNewCustomerDb(client: PoolClient, newUser: any ,name: s
     }
 }
 
-export async function deleteCustomerDb(customer: any, userId: string, changeLogId: string) {
+export async function deleteCustomerDb(client: PoolClient, customer: any, userId: string, changeLogId: string) {
 
-    let client: PoolClient | undefined;
-
-    try {
-        client = await pool.connect();
-
-        await client.query('BEGIN');
-
-        await client.query(`
+    await client.query(`
                     UPDATE "customer"
                     SET
                         flag_deleted = true,
@@ -105,8 +94,8 @@ export async function deleteCustomerDb(customer: any, userId: string, changeLogI
                     WHERE customer_id = $2
                 `, [changeLogId, customer.customer_id]);
 
-        await client.query(
-            `INSERT INTO "customer"
+    await client.query(
+        `INSERT INTO "customer"
                 (customer_phone_number, 
                 customer_address,
                 user_id,
@@ -114,22 +103,13 @@ export async function deleteCustomerDb(customer: any, userId: string, changeLogI
                 history_id,
                 change_log_id)
                 VALUES ($1, $2, $3, false, $4, $5);`,
-            [customer.customer_phone_number, customer.customer_address, userId, customer.customer_id, changeLogId]
-        );
+        [customer.customer_phone_number, customer.customer_address, userId, customer.customer_id, changeLogId]
+    );
 
-        await client.query('COMMIT');
-
-        return {
-            "deleted customer Id": customer.customer_id,
-            changeLogId
-        };
-
-    } catch (error) {
-        await client?.query('ROLLBACK');
-        throw error;
-    } finally {
-        client?.release();
-    }
+    return {
+        "deleted customer Id": customer.customer_id,
+        changeLogId
+    };
 }
 
 export async function updateCustomerDetailsInCustomerTableDb(client: PoolClient, setClause: string, values: any[], customer: any, userId: string, changeLogId: string) {

@@ -33,7 +33,7 @@ export const signUpStaffValidation = z.object({
 
 export const signUpCustomerValidation = signUpStaffValidation.extend({
     phoneNumber: z.e164(),
-    address : addressValidation.optional()
+    address: addressValidation.optional()
 });
 
 export const loginValidation = z.object({
@@ -54,4 +54,12 @@ export const customerQueryParamsValidationSchema = z.object({
     name: z.string().optional(),
     email: z.email().optional(),
     phoneNumber: z.e164().optional()
-});
+}).refine(
+    (data) =>
+        [data.name, data.email, data.phoneNumber].filter(
+            (value) => value !== undefined
+        ).length <= 1,
+    {
+        message: "Provide exactly one of: name, email, or phoneNumber",
+    }
+);

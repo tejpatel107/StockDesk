@@ -1,7 +1,5 @@
 import type { Request } from "express";
-import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb, getProductsByNameDb, getProductsBySkuDb } from "./product.db.js";
-import { error } from "node:console";
-import { randomUUID } from "node:crypto";
+import { getAllProductsDb, getProductsByCategoryIdDb, getProductsByNameOrSkuDb, getProductsWithinPriceRangeDb, getProductsWithinStockDb, getProductsOutOfStockDb, addNewProductDb, deleteProductDb, updateProductDb, getProductByIdDb, getProductsBySkuIfExistDb, getProductsByCatgoryIdsDb, addProductsInBulkDb, getProductByNameDb, getProductBySkuDb } from "./product.db.js";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 import { AppError, ConflictError, NotFoundError } from "../../utilities/globalErrorHandlers.js";
 import { csvRowValidationSchema } from "../../validators/productValidation.js";
@@ -21,108 +19,66 @@ export type ValidRow = {
     categoryId: string;
 };
 
+const allowedFields = {
+    name: "product_name",
+    price: "product_price",
+    quantity: "product_stock_quantity",
+    sku: "product_sku",
+    category_id: "category_id"
+} as const;
+
+type AllowedKeys = keyof typeof allowedFields;
+
 export async function getAllProductsService() {
-
-    try {
-        const products = await getAllProductsDb();
-        return {
-            statusCode: 200,
-            data: { count: products.length, products }
-        };
-
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
-    }
+    const { rows: products } = await getAllProductsDb();
+    return {
+        statusCode: 200,
+        data: { count: products.length, products }
+    };
 }
 
 
 export async function getProductsByNameOrSkuService(req: Request) {
-
     const { search } = req.query;
-    console.log(search);
-    try {
-        const products = await getProductsByNameOrSkuDb(search as string);
-        return {
-            statusCode: 200,
-            data: { count: products.length, products }
-        };
-
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
-    }
+    const { rows: products } = await getProductsByNameOrSkuDb(search as string);
+    return {
+        statusCode: 200,
+        data: { count: products.length, products }
+    };
 }
 
 export async function getProductsByCategoryIdService(req: Request) {
-
     const { categoryId } = req.query;
-    try {
-        const products = await getProductsByCategoryIdDb(categoryId as string);
-        return {
-            statusCode: 200,
-            data: { count: products.length, products }
-        };
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
-    }
+    const { rows: products } = await getProductsByCategoryIdDb(categoryId as string);
+    return {
+        statusCode: 200,
+        data: { count: products.length, products }
+    };
 }
 
 export async function getProductsWithinPriceRangeService(req: Request) {
     const { minPrice, maxPrice } = req.query;
 
-    try {
-        const products = await getProductsWithinPriceRangeDb(Number(minPrice), Number(maxPrice));
-        return {
-            statusCode: 200,
-            data: { count: products.length, products }
-        };
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
-    }
+    const { rows: products } = await getProductsWithinPriceRangeDb(Number(minPrice), Number(maxPrice));
+    return {
+        statusCode: 200,
+        data: { count: products.length, products }
+    };
 }
 
 export async function getProductsWithinStockService(req: Request) {
     const inStock = req.query.inStock === "true";
-
-    try {
-        const products = inStock ? await getProductsWithinStockDb() : await getProductsOutOfStockDb();
-        return {
-            statusCode: 200,
-            data: { count: products.length, products }
-        };
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
-    }
+    const { rows: products } = inStock ? await getProductsWithinStockDb() : await getProductsOutOfStockDb();
+    return {
+        statusCode: 200,
+        data: { count: products.length, products }
+    };
 }
 
 export async function getProductByIdService(req: Request) {
 
     const { id } = req.params;
-    
+
     const { rows: [product] } = await getProductByIdDb(id as string);
 
     if (!product)
@@ -139,23 +95,26 @@ export async function addNewProductService(req: Request) {
     const { name, price, quantity, sku, categoryId } = req.body;
     const userId: string = req.user?.userId;
 
-    console.log(userId);
+    let product;
 
+    product = (await getProductByNameDb(name)).rows[0];
 
-    const products = await getProductsByNameOrSkuDb(sku);
-    let product: any = products.length > 0 && products[0];
-
-    console.log(product);
-
-    if (product && product.product_sku === sku) {
-        throw new ConflictError("Product already exists");
+    if (product) {
+        throw new ConflictError(`Product by name ${name} already exists`);
     }
 
-    const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-    product = await addNewProductDb(randomUUID(), name, sku, price, quantity, categoryId, userId, changeLogId);
+    product = (await getProductBySkuDb(sku)).rows[0];
+
+    if (product) {
+        throw new ConflictError(`Product by sku ${sku} already exists`);
+    }
+
+    const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
+    const { rows : [newProduct]}  = await addNewProductDb(name, sku, price, quantity, categoryId, changeLog.change_log_id);
+
     return {
         statusCode: 201,
-        data: { product }
+        data: { newProduct }
     };
 
 }
@@ -165,31 +124,34 @@ export async function deleteProductService(req: Request) {
     const userId: string = req.user?.userId;
     const { id } = req.params;
 
+    let { rows: [product] } = await getProductByIdDb(id as string);
+
+    if (!product) {
+        throw new NotFoundError(`Product by id: ${id} not found!`);
+    }
+
+    const client = await pool.connect();
+
     try {
 
-        let { rows: [product] } = await getProductByIdDb(id as string);
+        await client.query('BEGIN');
 
-        if (!product) {
-            throw new Error("Product not found!");
-        }
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        console.log(product);
+        product = await deleteProductDb(client, product, changeLog.change_log_id);
 
-        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-
-        product = await deleteProductDb(product, userId, changeLogId);
+        await client.query('COMMIT');
 
         return {
             statusCode: 204,
             data: product
         };
     } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
+        await client.query('ROLLBACK');
+        throw new AppError(error.message);
+    }
+    finally {
+        client.release();
     }
 }
 
@@ -199,43 +161,60 @@ export async function updateProductService(req: Request) {
     const fields = req.body;
     const { sku, name } = fields;
 
+    let { rows: [product] } = await getProductByIdDb(id as string);
+
+    if (!product) {
+        throw new Error(`Product does not exist for id: ${id}, Please try to update existing product!`);
+    }
+
+    if (sku) {
+        const { rows: [existingProductWithSku] } = await getProductBySkuDb(sku);
+        if (existingProductWithSku)
+            throw new ConflictError(`Product with sku: ${sku} already exists. Editing is restricted`);
+    }
+
+    if (name) {
+        const { rows: [existingProductWithName] } = await getProductByNameDb(name);
+        if (existingProductWithName)
+            throw new ConflictError(`Product with name: ${name} already exists. Editing is restricted`);
+    }
+
+    const keys = (Object.keys(fields)).filter((key): key is AllowedKeys => {
+        return Object.hasOwn(allowedFields, key) && (fields[key] !== undefined || fields[key] !== null)
+    });
+
+    if (keys.length === 0) {
+        throw new Error("No valid fields provided for update");
+    }
+
+    const values = [...keys.map((k) => fields[k]), product.product_id];
+
+    const setClause = [
+        "change_log_id = $1",
+        ...keys.map((k, i) => `${allowedFields[k]} = $${i + 2}`),
+    ].join(", ");
+
+    const client = await pool.connect();
+
     try {
 
-        let { rows: [product] } = await getProductByIdDb(id as string);
+        await client.query('BEGIN');
 
-        if (!product) {
-            throw new Error("Product does not exist, Please try to update existing product!");
-        }
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
+        
+        product = await updateProductDb(client, product, setClause, values.toSpliced(0,0, changeLog.change_log_id), changeLog.change_log_id);
 
-        if (sku) {
-            const { rows: [existingProductWithSku] } = await getProductsBySkuDb(sku);
-            if (existingProductWithSku && existingProductWithSku.product_id !== product.product_id)
-                throw new ConflictError(`Product with sku: ${sku} already exists. Editing is restricted`);
-        }
-
-        if (name) {
-            const { rows: [existingProductWithName] } = await getProductsByNameDb(name);
-            if (existingProductWithName && existingProductWithName.product_id !== product.product_id)
-                throw new ConflictError(`Product with sku: ${sku} already exists. Editing is restricted`);
-        }
-
-        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-
-        product = await updateProductDb(product, userId, fields, changeLogId);
+        await client.query('COMMIT');
 
         return {
             statusCode: 200,
-            data: { product }
+            data: product
         };
     } catch (error) {
-
-        console.log(error.message);
-        return {
-            statusCode: (error as ConflictError).statusCode,
-            data: {
-                error: (error as any).message
-            }
-        };
+        await client.query('ROLLBACK');
+        throw new AppError(error.message);
+    } finally {
+        client.release();
     }
 }
 

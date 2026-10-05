@@ -38,5 +38,5 @@ export const addressValidation = z.object({
     city: z.string(),
     state: z.string(),
     postalCode: z.string(),
-    country: z.string()
+    country: z.string().optional()
 });

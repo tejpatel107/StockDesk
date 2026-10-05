@@ -51,7 +51,7 @@ export async function signupStaffService(req: Request) {
         throw new AppError(`Staff user cannot have role ${role}, valid roles for staff users are 'ADMIN' and 'STAFF' only.`);
     }
 
-    let user = await getUserByEmailDb(email);
+    const user = await getUserByEmailDb(email);
 
     if (user) {
         throw new ConflictError(`User with email ${email} already exists!`);
@@ -64,14 +64,14 @@ export async function signupStaffService(req: Request) {
     try {
         const { rows: [changeLog] } = await insertNewChangeLogRecord(SYSTEM_USER_ID, client);
 
-        user = await addNewUserDb(client, (firstName as string).concat(" ", lastName as string), email, hashedPassword, role, changeLog.change_log_id);
+        const { rows: [newUser] } = await addNewUserDb(client, (firstName as string).concat(" ", lastName as string), email, hashedPassword, role, changeLog.change_log_id);
 
         return {
             statusCode: 201,
             data: {
                 success: true,
                 message: "user registered successfully!",
-                data: user
+                data: newUser
             }
         }
     } catch (error) {
@@ -86,13 +86,15 @@ export async function signupStaffService(req: Request) {
 
 export async function singupCustomerService(req: Request) {
 
+    const userId = req.user?.userId;
+
     const { firstName, lastName, email, password, phoneNumber, address, role } = req.body;
 
     if (role === ROLES.SYSTEM || role === ROLES.ADMIN || role === ROLES.STAFF) {
         throw new AppError(`Invalid role ${role}, for customer. Customers can have only one role ${ROLES.CUSTOMER}.`);
     }
 
-    let user = await getUserByEmailDb(email);
+    const user = await getUserByEmailDb(email);
 
     if (user) {
         throw new ConflictError(`User with email ${email} already exists!`);
@@ -100,21 +102,29 @@ export async function singupCustomerService(req: Request) {
 
     const { rows: [customer] } = await getCustomerByPhoneNumberDb(phoneNumber);
 
-    if (customer && customer.phoneNumber === phoneNumber)
+    if (customer)
         throw new ConflictError(`Customer with existing phone number : ${phoneNumber} exists. Please try signing with another number`);
 
     const hashedPassword = await hashPassword(password);
     const fullName = `${firstName} ${lastName}`;
     const client = await pool.connect();
 
+    let changeLog = undefined;
+
     try {
         await client.query('BEGIN');
 
-        const { rows: [changeLog] } = await insertNewChangeLogRecord(SYSTEM_USER_ID, client);
+        if (userId) {
+            const { rows } = await insertNewChangeLogRecord(userId, client);
+            changeLog = rows[0];
+        } else {
+            const { rows } = await insertNewChangeLogRecord(SYSTEM_USER_ID, client);
+            changeLog = rows[0];
+        }
 
-        user = await addNewUserDb(client, fullName, email, hashedPassword, role, changeLog.change_log_id);
+        const { rows: [newUser] } = await addNewUserDb(client, fullName, email, hashedPassword, role, changeLog.change_log_id);
 
-        user = await addNewCustomerDb(client, user, fullName, email, phoneNumber, address, hashedPassword, ROLES.CUSTOMER, changeLog.change_log_id);
+        const newCustomer = await addNewCustomerDb(client, newUser, fullName, email, phoneNumber, address, hashedPassword, ROLES.CUSTOMER, changeLog.change_log_id);
 
         await client.query('COMMIT');
 
@@ -123,7 +133,7 @@ export async function singupCustomerService(req: Request) {
             data: {
                 success: true,
                 message: "customer registered successfully!",
-                data: user
+                data: newCustomer
             }
         }
 

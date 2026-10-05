@@ -2,10 +2,11 @@ import type { Request } from "express";
 import { insertNewChangeLogRecord } from "../../../db/change_log.js";
 import { addNewCustomerDb, deleteCustomerDb, getAllCustomersDb, getCustomerByIdDb, getCustomerByPhoneNumberDb, getCustomerByPhoneNumberOrEmailOrNameDb, updateCustomerDetailsInCustomerTableDb, updateCustomerDetailsInUserTableDb } from "./customer.db.js";
 import { pool } from "../../../db/db.js";
-import { getUserByEmailDb, getUserByIdDb } from "../auth/auth.db.js";
-import { SYSTEM_USER_ID } from "../../config/system.js";
-import { AppError, ConflictError } from "../../utilities/globalErrorHandlers.js";
+import { addNewUserDb, getUserByEmailDb, getUserByIdDb } from "../auth/auth.db.js";
+import { AppError, ConflictError, NotFoundError } from "../../utilities/globalErrorHandlers.js";
 import { hashPassword } from "../../utilities/hash.js";
+import { nativeEnum } from "zod/v3";
+import { ROLES } from "../../../db/roles.js";
 
 type CustomerUpdate = Partial<{
     name: string,
@@ -29,46 +30,38 @@ type CustomerKey = keyof typeof customerFieldMap;
 type UserKey = keyof typeof userFieldMap;
 
 export async function getAllCustomersService() {
-
-    try {
-        const categories = await getAllCustomersDb();
-        return {
-            statusCode: 200,
-            data: { count: categories.length, categories }
-        };
-
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
-    }
+    const { rows: categories } = await getAllCustomersDb();
+    return {
+        statusCode: 200,
+        data: { count: categories.length, categories }
+    };
 }
-
 
 export async function getCustomerByPhoneNumberOrEmailOrNameService(req: Request) {
+    const { email, phoneNumber, name } = req.query;
+    let customers = [];
 
-    const { search } = req.query;
-
-    try {
-        const customers = await getCustomerByPhoneNumberOrEmailOrNameDb((search as string).trim());
-        return {
-            statusCode: 200,
-            data: { count: customers.length, customers }
-        };
-
-    } catch (error) {
-        return {
-            statusCode: 500,
-            data: {
-                error: (error as any).message
-            }
-        };
+    if (email) {
+        const { rows } = await getCustomerByPhoneNumberOrEmailOrNameDb(email as string);
+        customers = rows;
     }
-}
 
+    if (name) {
+        const { rows } = await getCustomerByPhoneNumberOrEmailOrNameDb(name as string);
+        customers = rows;
+    }
+
+    if (phoneNumber) {
+        const { rows } = await getCustomerByPhoneNumberOrEmailOrNameDb(phoneNumber as string);
+        customers = rows;
+        console.log(customers);
+    }
+
+    return {
+        statusCode: 200,
+        data: { count: customers.length, customers }
+    };
+}
 
 export async function updateCustomerService(req: Request) {
     const userId: string = req.user?.userId;
@@ -78,14 +71,14 @@ export async function updateCustomerService(req: Request) {
 
     try {
 
-        let customer = await getCustomerByIdDb(customerId as string);
+        let { rows: [customer] } = await getCustomerByIdDb(customerId as string);
         if (!customer) {
             throw new Error("Customer does not exist, Please try to update existing Customer!");
         }
 
         let user = await getUserByIdDb(userId as string);
         if (!user) {
-            throw new Error("No user details found for the customer! Contact support.");
+            throw new NotFoundError("No user details found for the customer! Contact support.");
         }
 
         const customerKeys = Object.keys(updates).filter((key): key is CustomerKey => {
@@ -100,13 +93,13 @@ export async function updateCustomerService(req: Request) {
             throw new Error("No valid updates provided for updates!");
         }
 
-        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-
         await client.query('BEGIN');
+
+        const { rows : [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
         if (customerKeys.length > 0) {
 
-            const customerUpdateValues = [changeLogId,
+            const customerUpdateValues = [changeLog.change_log_id,
                 ...customerKeys.map((key) => updates[key]),
                 customerId];
 
@@ -117,12 +110,12 @@ export async function updateCustomerService(req: Request) {
 
             console.log(customerKeys, customerUpdateValues, customerUpdateSetClause);
 
-            customer = await updateCustomerDetailsInCustomerTableDb(client, customerUpdateSetClause, customerUpdateValues, customer, userId, changeLogId);
+            customer = await updateCustomerDetailsInCustomerTableDb(client, customerUpdateSetClause, customerUpdateValues, customer, userId, changeLog.change_log_id);
         }
 
         if (userKeys.length > 0) {
 
-            const userUpdateValues = [changeLogId,
+            const userUpdateValues = [changeLog.change_log_id,
                 ...userKeys.map((key) => updates[key]),
                 userId];
 
@@ -133,7 +126,7 @@ export async function updateCustomerService(req: Request) {
 
             console.log(userKeys, userUpdateValues, userUpdateSetClause);
 
-            user = await updateCustomerDetailsInUserTableDb(client, userUpdateSetClause, userUpdateValues, user, userId, changeLogId);
+            user = await updateCustomerDetailsInUserTableDb(client, userUpdateSetClause, userUpdateValues, user, userId, changeLog.change_log_id);
         }
 
         await client.query('COMMIT');
@@ -145,12 +138,7 @@ export async function updateCustomerService(req: Request) {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        return {
-            statusCode: 500,
-            data: {
-                error: error.message
-            }
-        };
+        throw new AppError(error.message);
     } finally {
         await client.release();
     }
@@ -160,23 +148,24 @@ export async function deleteCustomerService(req: Request) {
 
     const userId: string = req.user?.userId;
     const { id } = req.params;
-    console.log(req.customerId);
+
+    let { rows: [customer] } = await getCustomerByIdDb(id as string);
+
+    if (!customer) {
+        throw new NotFoundError(`Customer does not exist for id: ${id}!`);
+    }
+
+    const client = await pool.connect();
+
     try {
 
-        let customer = await getCustomerByIdDb(id as string);
+        await client.query('BEGIN');
 
-        if (!customer) {
-            throw new Error("Customer does not exist!");
-        }
+        const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        const changeLogId = (await insertNewChangeLogRecord(userId)).rows[0].change_log_id;
-        console.log(customer.customer_phone_number);
+        customer = await deleteCustomerDb(client, customer, userId, changeLog.change_log_id);
 
-        customer = await deleteCustomerDb(customer, userId, changeLogId);
-
-        if (!customer) {
-            throw Error("Error deleting Customer.");
-        }
+        await client.query('COMMIT');
 
         return {
             statusCode: 204,
@@ -184,46 +173,10 @@ export async function deleteCustomerService(req: Request) {
         };
 
     } catch (error: any) {
-        return {
-            statusCode: 500,
-            data: {
-                error: error.message
-            }
-        };
-    }
-}
-
-export async function addNewCustomerByStaffService(req: Request) {
-
-    const userId = req.user?.userId;
-
-    const { firstName, lastName, email, password, phoneNumber, address, role } = req.body;
-    let user = await getUserByEmailDb(email);
-
-    if (user) {
-        throw new ConflictError(`Customer with email ${email} already exists!`);
-    }
-
-    let { rows : [customer] } = await getCustomerByPhoneNumberDb(phoneNumber);
-
-    if (customer) {
-        throw new ConflictError(`Customer with phoneNumber ${phoneNumber} already exists!`);
-    }
-
-    const hashedPassword = await hashPassword(password);
-
-    const { rows: [changeLog] } = await insertNewChangeLogRecord(userId);
-
-    const client = await pool.connect();
-
-    try {
-        const newCustomer = await addNewCustomerDb(client, (firstName as string).concat(" ", lastName as string), email, phoneNumber, address, hashedPassword, role, changeLog.change_log_id);
-
-        return {
-            statusCode : 201,
-            data: newCustomer
-        }
-    } catch (error) {
+        await client.query('ROLLBACK');
         throw new AppError(error.message);
+    }
+    finally {
+        await client.release();
     }
 }
