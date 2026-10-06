@@ -49,16 +49,16 @@ export async function addNewSupplierService(req: Request) {
         await client.query('BEGIN');
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
-        const supplier = await addNewSupplierDb(client, name, email, phoneNumber, changeLog.change_log_id);
+        const { rows: [supplier] } = await addNewSupplierDb(client, name, email, phoneNumber, changeLog.change_log_id);
 
         await client.query('COMMIT');
 
         return {
             statusCode: 201,
             data: {
-                name: supplier.supplier_name,
-                email: supplier.supplier_email,
-                "phone number": supplier.supplier_phone_number,
+                name: supplier.supplierName,
+                email: supplier.supplierEmail,
+                "phone number": supplier.supplierPhoneNumber,
             }
         };
 
@@ -123,15 +123,7 @@ export async function updateSupplierService(req: Request) {
         throw new Error("No valid fields provided for update");
     }
 
-    const values = [...keys.map((k) => fields[k]), supplier.supplier_id];
-    console.log(values);
-
-    const setClause = [
-        "change_log_id = $1",
-        ...keys.map((k, i) => `${allowedFields[k]} = $${i + 2}`),
-    ].join(", ");
-    console.log(setClause);
-
+    const rows = keys.map((k) => ({ field: allowedFields[k], value: fields[k] }));
 
     const client = await pool.connect();
     try {
@@ -140,7 +132,7 @@ export async function updateSupplierService(req: Request) {
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        supplier = await updateSupplierDb(client, supplier, setClause, values.toSpliced(0,0,changeLog.change_log_id));
+        supplier = await updateSupplierDb(client, supplier, rows, changeLog.change_log_id);
 
         await client.query('COMMIT');
 

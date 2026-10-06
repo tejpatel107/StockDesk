@@ -6,6 +6,7 @@ import { csvRowValidationSchema, productCategoryQueryValidationSchema, productPr
 import { pool } from "../../../db/db.js";
 import { parse } from "csv-parse/sync";
 import { paginationQueryValidationSchema } from "../../validators/common.validation.js";
+import { insertQueryBuilder } from "../../../db/querybuilder.js";
 
 const MAX_ROWS = 5000;
 const REQUIRED_COLUMNS = ["name", "sku", "price", "quantity", "category_id"] as const;
@@ -136,7 +137,7 @@ export async function deleteProductService(req: Request) {
     let { rows: [product] } = await getProductByIdDb(id as string);
 
     if (!product) {
-        throw new NotFoundError(`Product by id: ${id} not found!`);
+        throw new NotFoundError(`Product by id: ${id} not found, or either the product is deleted!`);
     }
 
     const client = await pool.connect();
@@ -196,12 +197,7 @@ export async function updateProductService(req: Request) {
         throw new Error("No valid fields provided for update");
     }
 
-    const values = [...keys.map((k) => fields[k]), product.product_id];
-
-    const setClause = [
-        "change_log_id = $1",
-        ...keys.map((k, i) => `${allowedFields[k]} = $${i + 2}`),
-    ].join(", ");
+    const rows = keys.map((k) => ({ field: allowedFields[k], value: fields[k] }));
 
     const client = await pool.connect();
 
@@ -211,7 +207,7 @@ export async function updateProductService(req: Request) {
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        product = await updateProductDb(client, product, setClause, values.toSpliced(0, 0, changeLog.change_log_id), changeLog.change_log_id);
+        product = await updateProductDb(client, product, rows, changeLog.change_log_id);
 
         await client.query('COMMIT');
 

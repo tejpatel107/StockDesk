@@ -12,15 +12,30 @@
                 change_log_id AS "changeLogId";`
 */
 
-export function insertQueryBuilder(table: string, row: Record<string, unknown>, returning: string[] = [], returnAll = false) {
-    const columns = Object.keys(row);
-    const values = Object.values(row);
+export function insertQueryBuilder(table: string, rows: Record<string, unknown>[], returning: string[] = [], returnAll = false) {
+    const columns = rows.map(row => row.field);
+    const values = rows.map(row => row.value ?? null);
     const placeholders = columns.map((_, i) => `$${i + 1}`);
 
     let sql = `INSERT INTO "${table}" (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`;
 
     if (returnAll) sql += " RETURNING *";
-    else if (returning.length) sql += `RETURNING ${returning.join(", ")}`;
+    else if (returning.length) sql += ` RETURNING ${returning.join(", ")}`;
 
-    return sql;
+    return { sql, values };
+}
+
+export function updateQueryBuilder(table: string, rows: Record<string, unknown>[], id: string, returning: string[] = [], returnAll = false) {
+    const columns = rows.map(row => row.field);
+    const values = rows.map(row => row.value);
+
+    const setClause = columns.map((col, i) => `${col} = $${i + 1}`);
+    values.push(id);
+
+    let sql = `UPDATE "${table}" SET ${setClause.join(", ")} WHERE ${table}_id = $${values.length}`;
+
+    if (returnAll) sql += " RETURNING *";
+    else if (returning.length) sql += ` RETURNING ${returning.join(", ")}`;
+
+    return { sql, values };
 }

@@ -1,18 +1,14 @@
-import { randomUUID } from "crypto";
 import { pool } from "./db.js";
 import type { PoolClient } from "pg";
+import { insertQueryBuilder } from "./querybuilder.js";
 
 export async function insertNewChangeLogRecord(userId: string, client?: PoolClient) {
 
-    const db = client ?? pool;
+    const fieldObjects = [
+        { "field" : "user_id", "value" : userId },
+        { "field" : "change_log_timestamp", "value" : new Date() }
+    ]
 
-    return await db.query(`
-            INSERT INTO change_log (
-                user_id,
-                change_log_timestamp
-            ) VALUES ($1, now())
-            RETURNING *           
-            `,
-        [userId]
-    );
+    const { sql, values } = insertQueryBuilder("change_log", fieldObjects, [], true);
+    return client ? client.query(sql, values) : await pool.query(sql, values);    
 }

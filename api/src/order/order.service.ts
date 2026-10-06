@@ -141,22 +141,22 @@ export async function createNewOrderService(req: Request) {
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        const updateProductQuantities = new Map(
+        const updatedProductQuantities = new Map(
             products.map(product => [product.product_id, product.product_quantity - itemsMap.get(product.product_id)])
         );
 
         const { rows: [order] } = await createNewOrderDb(client, customerId, ORDER_STATUSES.PENDING, orderTotal, changeLog.change_log_id);
+        console.log(order.order_id);
+        await addOrderItemsDb(client, order.order_id, products, itemsMap, lineTotals);
 
-        await addOrderItemsDb(client, order.orderId, products, itemsMap, lineTotals);
-
-        await updateProductQuantityDb(client, changeLog.change_log_id, products, updateProductQuantities);
+        await updateProductQuantityDb(client, changeLog.change_log_id, products, updatedProductQuantities);
 
         await client.query('COMMIT');
 
         return {
             statusCode: 201,
             data: {
-                orderId: order.orderId
+                orderId: order.order_id
             }
         }
 
@@ -213,13 +213,12 @@ export async function updateOrderService(req: Request) {
 
     const { rows: orderItems } = await getOrderByIdDb(orderId as string);
 
-    console.log(orderItems);
-
     if (orderItems.length === 0) {
         throw new AppError(`order for order_id: ${orderId} does not exist!`);
     }
 
     const order = orderItems[0];
+    console.log(order)
 
     if (order.order_status === ORDER_STATUSES.CANCELLED) {
         throw new AppError("ordered is already canceled! Can't process or change the status of canceled orders.");
@@ -250,7 +249,7 @@ export async function updateOrderService(req: Request) {
 
         const { rows: [changeLog] } = await insertNewChangeLogRecord(userId, client);
 
-        const { rows: [updatedOrder] } = await changeOrderStatusDb(client, orderId as string, changeLog.change_log_id, status);
+        const { rows: [updatedOrder] } = await changeOrderStatusDb(client, order, changeLog.change_log_id, status);
 
         if (status === ORDER_STATUSES.CANCELLED) {
 
@@ -272,7 +271,7 @@ export async function updateOrderService(req: Request) {
         await client.query('COMMIT');
 
         return {
-            statusCode: 204,
+            statusCode: 200,
             data: updatedOrder
         }
     } catch (error) {

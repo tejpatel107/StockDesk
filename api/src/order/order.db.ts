@@ -1,7 +1,7 @@
-import { randomUUID } from "crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import type { ORDER_STATUSES } from "../../validators/order.validation.js";
+import { insertQueryBuilder, updateQueryBuilder } from "../../../db/querybuilder.js";
 
 
 export interface OrderFilters {
@@ -63,22 +63,24 @@ export async function getOrderByIdDb(orderId: string) {
   const query = `
     WITH order_summary AS (
       SELECT 
-        o.order_id,
-        o.order_date,
-        o.order_status,
-        o.order_total_amount
+        *
       FROM "order" o 
       WHERE (o.history_id IS NULL) AND (o.flag_deleted = false) AND (o.order_id = $1)
     ),
     order_item_summary AS (
       SELECT 
         os.order_id,
+        os.customer_id,
         oi.order_item_id,
         oi.product_id AS "productId",
         os.order_date,
+        os.order_created_at,
         os.order_status,
         os.order_total_amount,
-        oi.order_item_quantity AS "quantity"
+        oi.order_item_quantity AS "quantity",
+        os.history_id,
+        os.change_log_id,
+        os.flag_deleted
       FROM "order_summary" os
       LEFT JOIN "order_item" oi ON os.order_id = oi.order_id
     )
@@ -184,8 +186,13 @@ export async function getProductsDb(client: PoolClient, productIds: string[]) {
   const query = `
         SELECT 
             product_id,
+            product_name,
+            product_sku,
             product_price,
-            product_stock_quantity AS product_quantity
+            product_stock_quantity AS product_quantity,
+            category_id,
+            flag_deleted,
+            change_log_id
         FROM "product"
         WHERE product_id = ANY($1::uuid[]) AND flag_deleted = false AND history_id IS NULL
         FOR UPDATE;
@@ -193,27 +200,27 @@ export async function getProductsDb(client: PoolClient, productIds: string[]) {
   return client.query(query, [productIds]);
 }
 
-export async function createNewOrderDb(
-  client: PoolClient,
-  customerId: string,
-  status: ORDER_STATUSES,
-  orderTotal: number,
-  changeLogId: string
-) {
+export async function createNewOrderDb(client: PoolClient, customerId: string, status: ORDER_STATUSES, orderTotal: number, changeLogId: string, historyId: any = null, flag_deleted = false) {
 
-  const query = `
-    INSERT INTO "order" (
-      customer_id,
-      order_status,
-      order_total_amount,
-      flag_deleted,
-      history_id,
-      change_log_id
-    ) VALUES ($1, $2, $3, false, NULL, $4)
-     RETURNING order_id AS "orderId";`;
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const orderDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`; // YYYY-MM-DD (local)
+  const orderTime = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`; // HH:MM:SS (local)
 
-  return client.query(query, [customerId, status, orderTotal, changeLogId])
+  const fieldObjects = [
+    { "field": "customer_id", "value": customerId },
+    { "field": "order_date", "value": orderDate },
+    { "field": "order_created_at", "value": orderTime },
+    { "field": "order_status", "value": status },
+    { "field": "order_total_amount", "value": orderTotal },
+    { "field": "change_log_id", "value": changeLogId },
+    { "field": "history_id", "value": historyId },
+    { "field": "flag_deleted", "value": flag_deleted }
+  ];
 
+  const { sql, values } = insertQueryBuilder("order", fieldObjects, [], true);
+  console.log(sql)
+  return client ? await client.query(sql, values) : await pool.query(sql, values);
 }
 
 export async function addOrderItemsDb(
@@ -250,59 +257,66 @@ export async function addOrderItemsDb(
   );
 }
 
-export async function updateProductQuantityDb(
-  client: PoolClient, changeLogId: string, products: any[], itemsMap: Map<string, number>) {
+export async function updateProductQuantityDb(client: PoolClient, changeLogId: string, products: any[], itemsMap: Map<string, number>) {  // productId -> new stock quantity {
+  const productIds = Array.from(itemsMap.keys());
 
-  const productIds: string[] = Array.from(itemsMap.keys());
-  const quantities: number[] = Array.from(itemsMap.values());
+  for (const product of products) {
+    const { sql, values } = insertQueryBuilder("product", [
+      { field: "product_name", value: product.product_name },
+      { field: "product_sku", value: product.product_sku },
+      { field: "product_price", value: product.product_price },
+      { field: "product_stock_quantity", value: product.product_quantity },
+      { field: "category_id", value: product.category_id },
+      { field: "flag_deleted", value: product.flag_deleted },
+      { field: "history_id", value: product.product_id },
+      { field: "change_log_id", value: product.change_log_id },
+    ]);
+    await client.query(sql, values);
+  }
 
-  // Lock the rows we're about to touch so concurrent orders can't race on the same product
-  await client.query(
-    `SELECT product_id FROM product WHERE product_id = ANY($1::uuid[]);`,
-    [productIds]
-  );
+  const updated: Record<string, unknown>[] = [];
 
-  await client.query(
-    `INSERT INTO product (
-       product_name, 
-       product_sku, 
-       product_price,
-       product_stock_quantity, 
-       category_id, 
-       flag_deleted,
-       history_id, 
-       change_log_id
-     )
-     SELECT product_name, product_sku, product_price,
-            product_stock_quantity, category_id, flag_deleted,
-            product_id, change_log_id
-     FROM product
-     WHERE product_id = ANY($1::uuid[])`,
-    [productIds]
-  );
+  // 2. Update the live row
+  for (const [productId, quantity] of itemsMap) {
+    const { sql, values } = updateQueryBuilder(
+      "product",
+      [
+        { field: "product_stock_quantity", value: quantity },
+        { field: "change_log_id", value: changeLogId },
+      ],
+      productId,
+      ["product_id", "product_stock_quantity"]
+    );
+    const { rows } = await client.query(sql, values);
+    updated.push(...rows);
+  }
 
-  const query = `
-    UPDATE product AS p
-    SET product_stock_quantity = u.quantity, change_log_id = $3
-    FROM UNNEST(
-      $1::uuid[], $2::int[]
-    ) AS u(product_id, quantity)
-    WHERE p.product_id = u.product_id;
-  `;
-
-  return await client.query(query, [productIds, quantities, changeLogId]);
+  return updated;
 }
 
-export async function changeOrderStatusDb(client: PoolClient, orderId: string, changeLogId: string, status: ORDER_STATUSES) {
+export async function changeOrderStatusDb(client: PoolClient, order: any, changeLogId: string, status: ORDER_STATUSES) {
 
-  const query = `
-    UPDATE "order" AS o
-    SET order_status = $1, change_log_id = $2
-    WHERE order_id = $3
-    RETURNING 
-      o.order_id AS "orderId",
-      o.order_status AS "orderStatus";`;
+  const { sql, values } = updateQueryBuilder("order",
+    [{ "field": "order_status", "value": status },
+    { "field": "change_log_id", "value": changeLogId }],
+    order.order_id, [], true);
 
-  return await client.query(query, [status, changeLogId, orderId]);
+  const res = await client.query(sql, values);
+
+  const fieldObjects = [
+    { "field": "customer_id", "value": order.customer_id },
+    { "field": "order_date", "value": order.order_date },
+    { "field": "order_created_at", "value": order.order_created_at },
+    { "field": "order_status", "value": order.order_status },
+    { "field": "order_total_amount", "value": order.order_total_amount },
+    { "field": "change_log_id", "value": changeLogId },
+    { "field": "history_id", "value": order.order_id },
+    { "field": "flag_deleted", "value": order.flag_deleted }
+  ];
+
+  const { sql : insertQuery, values : insertQueryValues } = insertQueryBuilder("order", fieldObjects, [], true);
+  await client.query(insertQuery, insertQueryValues);
+
+  return res;
 
 } 

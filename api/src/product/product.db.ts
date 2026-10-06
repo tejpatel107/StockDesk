@@ -2,6 +2,7 @@ import { randomUUID, type UUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
 import type { ValidRow } from "./product.service.js";
+import { insertQueryBuilder, updateQueryBuilder } from "../../../db/querybuilder.js";
 
 export async function getAllProductsDb(pageSize: number, offset: number) {
     const query = `
@@ -97,96 +98,71 @@ export async function getProductsOutOfStockDb(pageSize: number, offset: number) 
     return await pool.query(query, [pageSize, offset]);
 }
 
-export async function addNewProductDb(name: string, sku: string, price: number, quantity: number, category_id: string, changeLogId: string) {
+export async function addNewProductDb(name: string, sku: string, price: number, quantity: number, categoryId: string, changeLogId: string, historyId: any = null, client?: PoolClient) {
 
-    return await pool.query(
-        `INSERT INTO "product"
-                (product_name, 
-                product_sku, 
-                product_price, 
-                product_stock_quantity,
-                category_id, 
-                flag_deleted, 
-                change_log_id, 
-                history_id)
-                VALUES ($1, $2, $3, $4, $5, false, $6, NULL)
-                RETURNING
-                    product_id AS "productId",
-                    product_name AS "productName",
-                    product_sku AS "productSku",
-                    product_price AS "productPrice",
-                    product_stock_quantity AS "productQuantity";`,
-        [name, sku, price, quantity, category_id, changeLogId]
-    );
+    const fieldObjects = [
+        { "field": "product_name", "value": name },
+        { "field": "product_sku", "value": sku },
+        { "field": "product_price", "value": price },
+        { "field": "product_stock_quantity", "value": quantity },
+        { "field": "category_id", "value": categoryId },
+        { "field": "change_log_id", "value": changeLogId },
+        { "field": "history_id", "value": historyId },
+        { "field": "flag_deleted", "value": false }
+    ];
+
+    const { sql, values } = insertQueryBuilder("product", fieldObjects, [], true);
+    return client ? await client.query(sql, values) : await pool.query(sql, values);
 }
 
 export async function deleteProductDb(client: PoolClient, product: any, changeLogId: string) {
 
-    await client.query(`
-                    UPDATE product
-                    SET
-                        flag_deleted = true,
-                        change_log_id = $1
-                    WHERE product_id = $2
-                `, [changeLogId, product.product_id]);
+    const fieldObjects = [
+        { "field": "flag_deleted", "value": true },
+        { "field": "change_log_id", "value": changeLogId }
+    ]
 
-    await client.query(`
-                INSERT INTO product (
-                    product_name,
-                    product_sku,
-                    product_price,
-                    product_stock_quantity,
-                    category_id,
-                    flag_deleted,
-                    history_id,
-                    change_log_id
-                ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
-            `, [product.product_name,
-    product.product_sku,
-    product.product_price,
-    product.product_stock_quantity,
-    product.category_id,
-    product.product_id,
-    product.change_log_id
-    ]);
+    const { sql, values } = updateQueryBuilder("product", fieldObjects, product.product_id, []);
+    await client.query(sql, values);
 
-    return {
-        "deleted product id": product.product_id,
-        changeLogId
-    };
+    await addNewProductDb(
+        product.product_name,
+        product.product_sku,
+        product.product_price,
+        product.product_stock_quantity,
+        product.category_id,
+        changeLogId,
+        product.product_id,   // history_id
+        client
+    );
+
+    return { "deleted product id": product.product_id, changeLogId };
 }
 
-export async function updateProductDb(client: PoolClient, product: any, setClause: string, values: string[], changeLogId: string) {
+export async function updateProductDb(client: PoolClient, product: any, rows: { field: string; value: unknown }[], changeLogId: string) {
+
+    const { sql, values } = updateQueryBuilder(
+        "product",
+        [{ field: "change_log_id", value: changeLogId }, ...rows],
+        product.product_id,
+        [],
+        true // RETURNING *
+    );
 
     const {
         rows: [updatedProduct],
-    } = await client.query(
-        `UPDATE product
-             SET ${setClause}
-             WHERE product_id = $${values.length}
-             RETURNING *`,
-        values
-    );
+    } = await client.query(sql, values);
 
-    await client.query(`
-                INSERT INTO product (
-                    product_name,
-                    product_sku,
-                    product_price,
-                    product_stock_quantity,
-                    category_id,
-                    flag_deleted,
-                    history_id,
-                    change_log_id
-                ) VALUES ( $1, $2, $3, $4, $5, false, $6, $7)
-            `, [product.product_name,
-    product.product_sku,
-    product.product_price,
-    product.product_stock_quantity,
-    product.category_id,
-    product.product_id,
-    product.change_log_id
-    ]);
+    await addNewProductDb(
+        product.product_name,
+        product.product_sku,
+        product.product_price,
+        product.product_stock_quantity,
+        product.category_id,
+        changeLogId,
+        product.product_id,   // history_id
+        client
+    );
 
     return {
         product: updatedProduct,

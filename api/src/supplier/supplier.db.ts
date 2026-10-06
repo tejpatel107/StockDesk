@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { pool } from "../../../db/db.js";
+import { insertQueryBuilder, updateQueryBuilder } from "../../../db/querybuilder.js";
 
 export async function getAllSuppliersDb() {
     let query = `
@@ -35,51 +36,49 @@ export async function getSuppliersByEmailOrPhoneNumberDb(value: string) {
 
 export async function addNewSupplierDb(client: PoolClient, name: string, email: string, phoneNumber: string, changeLogId: string) {
 
-    const { rows: [supplier] } = await client.query(
-        `INSERT INTO "supplier"
-                (supplier_name, 
-                supplier_email,
-                supplier_phone_number,
-                flag_deleted, 
-                change_log_id, 
-                history_id)
-                VALUES ($1, $2, $3, false, $4, NULL)
-                RETURNING
-                    supplier_id AS "supplierId",
-                    supplier_name AS "supplierName",
-                    supplier_email AS "supplierEmail",
-                    supplier_phone_number AS "supplierPhoneNumber";`,
-        [name, email, phoneNumber, changeLogId]
+    const { sql, values } = insertQueryBuilder(
+        'supplier',
+        [
+            { "field": "supplier_name", "value": name },
+            { "field": "supplier_email", "value": email },
+            { "field": "supplier_phone_number", "value": phoneNumber },
+            { "field": "flag_deleted", "value": false },
+            { "field": "change_log_id", "value": changeLogId },
+            { "field": "history_id", "value": null }
+        ],
+        [
+            'supplier_id AS "supplierId"',
+            'supplier_name AS "supplierName"',
+            'supplier_email AS "supplierEmail"',
+            'supplier_phone_number AS "supplierPhoneNumber"'
+        ]
     );
 
-    return supplier;
+    return await client.query(sql, values);
 }
 
 export async function deleteSupplierDb(client: PoolClient, supplier: any, changeLogId: string) {
 
-    await client.query(`
-                    UPDATE supplier
-                    SET
-                        flag_deleted = true,
-                        change_log_id = $1
-                    WHERE supplier_id = $2
-                `, [changeLogId, supplier.supplier_id]);
+    const { sql, values } = updateQueryBuilder(
+        "supplier",
+        [
+            { field: "flag_deleted", value: true },
+            { field: "change_log_id", value: changeLogId },
+        ],
+        supplier.supplier_id
+    );
+    await client.query(sql, values);
 
-    await client.query(`
-                INSERT INTO supplier (
-                    supplier_name,
-                    supplier_email,
-                    supplier_phone_number,
-                    flag_deleted,
-                    history_id,
-                    change_log_id
-                ) VALUES ( $1, $2, $3, false, $4, $5)
-            `, [supplier.supplier_name,
-    supplier.supplier_email,
-    supplier.supplier_phone_number,
-    supplier.supplier_id,
-    supplier.change_log_id
+    // 2. Insert the history row (snapshot of the supplier before deletion)
+    const historyQuery = insertQueryBuilder("supplier", [
+        { field: "supplier_name", value: supplier.supplier_name },
+        { field: "supplier_email", value: supplier.supplier_email },
+        { field: "supplier_phone_number", value: supplier.supplier_phone_number },
+        { field: "flag_deleted", value: supplier.flag_deleted },
+        { field: "history_id", value: supplier.supplier_id },
+        { field: "change_log_id", value: supplier.change_log_id },
     ]);
+    await client.query(historyQuery.sql, historyQuery.values);
 
     return {
         "deleted supplier id": supplier.supplier_id,
@@ -87,34 +86,33 @@ export async function deleteSupplierDb(client: PoolClient, supplier: any, change
     };
 }
 
-export async function updateSupplierDb(client: PoolClient, supplier: any, setClause: string, values: any[]) {
+export async function updateSupplierDb(client: PoolClient, supplier: any, rows: { field: string; value: unknown }[], changeLogId: string) {
 
+    // 1. Update the current row
+    const { sql, values } = updateQueryBuilder(
+        "supplier",
+        [
+            { "field" : "change_log_id", value : changeLogId },
+            ...rows
+        ],
+        supplier.supplier_id,
+        [],
+        true // RETURNING *
+    );
     const {
         rows: [updatedSupplier],
-    } = await client.query(
-        `UPDATE supplier
-             SET ${setClause}
-             WHERE supplier_id = $${values.length}
-             RETURNING *`,
-        values
-    );
+    } = await client.query(sql, values);
 
-    await client.query(`
-                INSERT INTO supplier (
-                    supplier_name,
-                    supplier_email,
-                    supplier_phone_number,
-                    flag_deleted,
-                    history_id,
-                    change_log_id
-                ) VALUES ( $1, $2, $3, false, $4, $5)
-            `, [supplier.supplier_name,
-    supplier.supplier_email,
-    supplier.supplier_phone_number,
-    supplier.supplier_id,
-    supplier.change_log_id
+    // 2. Insert the history row (snapshot of the supplier before the update)
+    const historyQuery = insertQueryBuilder("supplier", [
+        { field: "supplier_name", value: supplier.supplier_name },
+        { field: "supplier_email", value: supplier.supplier_email },
+        { field: "supplier_phone_number", value: supplier.supplier_phone_number },
+        { field: "flag_deleted", value: supplier.flag_deleted },
+        { field: "history_id", value: supplier.supplier_id },
+        { field: "change_log_id", value: changeLogId },
     ]);
+    await client.query(historyQuery.sql, historyQuery.values);
 
     return updatedSupplier;
-
 }
