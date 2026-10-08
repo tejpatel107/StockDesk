@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 
 export async function hashPassword(plainPassword: string): Promise<string> {
-  const saltRounds = 10; // cost factor — higher = slower but more secure
+  const saltRounds = 6; // cost factor — higher = slower but more secure
   const hash = await bcrypt.hash(plainPassword, saltRounds);
   return hash;
 }

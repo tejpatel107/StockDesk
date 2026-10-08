@@ -8,6 +8,7 @@ import { ROLES } from "../../../db/roles.js";
 const customerRouter: Router = express.Router();
 
 customerRouter.get("/", authorizeUser(ROLES.ADMIN, ROLES.STAFF), validate({ query: customerQueryParamsValidationSchema }), getCustomersController);
+// customerRouter.get("/", validate({ query: customerQueryParamsValidationSchema }), getCustomersController);
 customerRouter.delete("/:id", validate({ params: customerIdValidationSchema }), authorizeUser(ROLES.CUSTOMER), attachCustomer({ required: true}), requireOwnCustomer(), deleteCustomerController);
 customerRouter.patch("/:id", validate({ body: updateCustomerDetailsValidationSchema }), authorizeUser(ROLES.CUSTOMER), updateCustomerController);
 customerRouter.post("/", authorizeUser(ROLES.ADMIN, ROLES.STAFF), validate({ body: signUpCustomerValidation }), addNewCustomerByStaffController);

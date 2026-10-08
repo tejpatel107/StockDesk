@@ -14,7 +14,7 @@ export async function getAllCustomersDb() {
         LEFT JOIN "user" AS u  
         ON c.user_id = u.user_id AND (u.history_id is NULL) AND (u.flag_deleted = false)
         WHERE (c.history_id is NULL) AND (c.flag_deleted = false);`;
-
+    console.log(query)
     return (await pool.query(query));
 }
 

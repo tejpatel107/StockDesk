@@ -3,7 +3,8 @@ import { createNewOrderController, getOrderByIdForCustomerController, getOrderBy
 import { validate } from "../../middlewares/validate.middleware.js";
 import { addNewOrderValidationSchema, orderParamIdValidationSchema, updateOrderValidationSchema } from "../../validators/order.validation.js";
 import { ROLES } from "../../../db/roles.js";
-import { attachCustomer, authorizeUser } from "../../middlewares/auth.middleware.js";
+import { authorizeUser } from "../../middlewares/auth.middleware.js";
+import { cacheResponse } from "../../middlewares/cacheResponse.ts";
 
 const orderRouter : Router = express.Router();
 

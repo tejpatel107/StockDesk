@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Load Test Results</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; color: #1f2937; }
+  h1 { margin-bottom: .25rem; }
+  .meta { color: #6b7280; margin-bottom: 1.5rem; font-size: .9rem; }
+  table { border-collapse: collapse; min-width: 640px; }
+  th, td { border: 1px solid #e5e7eb; padding: .5rem .9rem; text-align: right; }
+  th { background: #f3f4f6; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  td.good { color: #047857; font-weight: 600; }
+  td.warn { color: #b45309; font-weight: 600; }
+  td.bad  { color: #b91c1c; font-weight: 600; }
+  .legend { margin-top: 1rem; font-size: .85rem; color: #6b7280; }
+</style>
+</head>
+<body>
+  <h1>Load Test Results</h1>
+  <div class="meta">
+    Run at 2026-10-08T09:02:18.288Z<br>
+    Endpoint: <code>GET http://localhost:8000/api/orders?pageSize=100&status=CANCELLED</code>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Concurrency</th><th>Duration_MS</th><th>Total Requests</th><th>Success %</th><th>Failure</th><th>Rate (req/sec)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>5</td>
+        <td>1000</td>
+        <td>17</td>
+        <td class="warn">71</td>
+        <td>5</td>
+        <td>8</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>2000</td>
+        <td>33</td>
+        <td class="warn">70</td>
+        <td>10</td>
+        <td>11</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>5000</td>
+        <td>74</td>
+        <td class="bad">68</td>
+        <td>24</td>
+        <td>9</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>10000</td>
+        <td>140</td>
+        <td class="bad">66</td>
+        <td>47</td>
+        <td>9</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>1000</td>
+        <td>57</td>
+        <td class="bad">12</td>
+        <td>50</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>2000</td>
+        <td>102</td>
+        <td class="bad">12</td>
+        <td>90</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>5000</td>
+        <td>254</td>
+        <td class="bad">9</td>
+        <td>230</td>
+        <td>4</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>10000</td>
+        <td>549</td>
+        <td class="bad">8</td>
+        <td>505</td>
+        <td>4</td>
+      </tr>
+      <tr>
+        <td>20</td>
+        <td>1000</td>
+        <td>84</td>
+        <td class="bad">8</td>
+        <td>77</td>
+        <td>4</td>
+      </tr>
+      <tr>
+        <td>20</td>
+        <td>2000</td>
+        <td>169</td>
+        <td class="bad">7</td>
+        <td>157</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>20</td>
+        <td>5000</td>
+        <td>397</td>
+        <td class="bad">5</td>
+        <td>379</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>20</td>
+        <td>10000</td>
+        <td>800</td>
+        <td class="bad">4</td>
+        <td>768</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>50</td>
+        <td>1000</td>
+        <td>113</td>
+        <td class="bad">7</td>
+        <td>105</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>50</td>
+        <td>2000</td>
+        <td>203</td>
+        <td class="bad">6</td>
+        <td>190</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>50</td>
+        <td>5000</td>
+        <td>450</td>
+        <td class="bad">4</td>
+        <td>431</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>50</td>
+        <td>10000</td>
+        <td>819</td>
+        <td class="bad">4</td>
+        <td>786</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>100</td>
+        <td>1000</td>
+        <td>151</td>
+        <td class="bad">7</td>
+        <td>141</td>
+        <td>4</td>
+      </tr>
+      <tr>
+        <td>100</td>
+        <td>2000</td>
+        <td>241</td>
+        <td class="bad">6</td>
+        <td>226</td>
+        <td>5</td>
+      </tr>
+      <tr>
+        <td>100</td>
+        <td>5000</td>
+        <td>471</td>
+        <td class="bad">4</td>
+        <td>451</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>100</td>
+        <td>10000</td>
+        <td>857</td>
+        <td class="bad">4</td>
+        <td>820</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>500</td>
+        <td>1000</td>
+        <td>500</td>
+        <td class="bad">5</td>
+        <td>475</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>500</td>
+        <td>2000</td>
+        <td>558</td>
+        <td class="bad">4</td>
+        <td>536</td>
+        <td>3</td>
+      </tr>
+      <tr>
+        <td>500</td>
+        <td>5000</td>
+        <td>638</td>
+        <td class="bad">3</td>
+        <td>617</td>
+        <td>2</td>
+      </tr>
+      <tr>
+        <td>500</td>
+        <td>10000</td>
+        <td>1035</td>
+        <td class="bad">3</td>
+        <td>1003</td>
+        <td>2</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="legend">
+    Success %: green &ge; 95, amber 70&ndash;94, red &lt; 70.
+    Rate = successful requests per second.
+  </div>
+</body>
+</html>

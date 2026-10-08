@@ -61,13 +61,19 @@ export async function getOrdersService(req: Request): Promise<PaginatedOrders | 
     const limitIndex = params.length - 1;
     const offsetIndex = params.length;
 
-    const { rows: orders } = (await getOrdersDb(params, whereClause.join(" AND "), limitIndex, offsetIndex, sort));
-    return {
-        statusCode: 200,
-        data: {
-            count: orders.length,
-            orders
+    try {
+
+        const { rows: orders } = (await getOrdersDb(params, whereClause.join(" AND "), limitIndex, offsetIndex, sort));
+        return {
+            statusCode: 200,
+            data: {
+                count: orders.length,
+                orders
+            }
         }
+    } catch (error) {
+        console.log("error: ", error);
+        // throw new AppError(error.message);
     }
 }
 
